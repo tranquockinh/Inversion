@@ -1,7 +1,7 @@
 import numpy as np
 import sympy as sp
 import matplotlib.pyplot as plt
-#============================DISPERSION============================
+# DISPERSION
 Layer_Data = np.array([[100,5],
                        [200,np.inf]])
 # Arrange vectors of shear wave velocity and depth
@@ -41,15 +41,13 @@ def weighting(D,WL):
     weights = Area_i / Area
     return weights
 # Computing phase velocity by weighted average at each wavelength
-wp = np.zeros((DC_points),dtype='object')
 beta = (0.87+1.12*PR)/(1+PR)
 Vph = np.zeros((DC_points))
 for i in range(DC_points):
-    wp[i] = np.zeros((num_layer))
-    wp[i] = weighting(Depth,Lambda[i])
+    wp = weighting(Depth,Lambda[i])
     Vph[i] = np.dot(beta*Vs,wp[i].flatten())
-    print(('WAVELENGTH-{} PASSED------PHASE VELOCITY = {}').format(i,Vph[i]))
-fig,ax = plt.subplots(1,2,figsize=(3,5))
+    print(('WAVELENGTH{}---WEIGHTING = {}---PHASE VELOCITY = {}').format(i+1,wp,Vph[i]))
+fig,ax = plt.subplots(1,2,figsize=(6,6),dpi=100)
 ax[0].plot(Vph,Lambda,'-o',markerfacecolor='None')
 ax[0].invert_yaxis()
 ax[0].set_xlabel('Phase velocity, Vph [m/s]')
@@ -59,16 +57,29 @@ ax[0].xaxis.tick_top()
 ax[0].set_xlim(0,Vs[-1])
 ax[0].spines['bottom'].set_color('white')
 ax[0].spines['right'].set_color('white')
-
-#============================INVERSION============================
+# INVERSION
 # Srating from data from dispersion curve
 # Data include: Phase velocity, Wavelength, Alpha
-Alpha = 0.35
-Vs_i = np.zeros((num_layer))
+Alpha = 0.2
+Step_Z = 0
+Step_Vph = []
+Vs = np.zeros((DC_points))
 # Suppose I have only one layer
+# Adding layers
 for i in range(DC_points):
-    Vs_i[i] = (1/beta)*Vph[i]
-    Vs_i[i:] = Vs_i[i]
-    # Compute weight
-    weight
+    Step_Z = np.append(Step_Z,Alpha*Lambda[i])
+    Depth = np.append(Step_Z,np.inf)
+    weighting_factor,num_layer = weighting(Depth,Lambda[i])
+    Step_Vph = np.append(Vph[:i+1],Vph[i])
+    Vs[i] = np.dot((1/beta)*Step_Vph,weighting_factor)
+    print(('LAYER{}---PHASE VELOCITY = {}---SHEAR WAVE VELOCITY = {}').format(i+1,Vph[i],Vs[i]))
+    ax[1].step(Vs[:i],Step_Z[:i],'r',markerfacecolor='None')
+    ax[1].invert_yaxis()
+    ax[1].set_xlabel('shear wave velocity, Vs [m/s]')
+    ax[1].set_ylabel('Wavelength, [m]')
+    ax[1].xaxis.set_label_position('top')
+    ax[1].xaxis.tick_top()
+    ax[1].set_xlim(0,Vs[-1])
+    ax[1].spines['bottom'].set_color('white')
+    ax[1].spines['right'].set_color('white')
 plt.show()
