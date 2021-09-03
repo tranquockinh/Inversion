@@ -2,11 +2,11 @@ import numpy as np
 import sympy as sp
 import matplotlib.pyplot as plt
 # DISPERSION
+# DISPERSION
 Layer_Data = np.array([[100,5],
                        [200,np.inf]])
 # Arrange vectors of shear wave velocity and depth
 Depth = np.append(0,Layer_Data[:,1])
-num_layer = len(Depth) - 1
 Vs = Layer_Data[:,0]
 # Poisson's ratio
 PR = 0.3
@@ -33,22 +33,23 @@ def weighting(D,WL):
     # Particle displacement function
     PDF = (cv1*sp.exp(cv3/WL*z) + cv2*sp.exp(cv4/WL*z))*material_coefficient
     # Loop to compute wave a the wavelength given
+    num_layer = len(Depth) - 1
     Area_i = np.zeros((num_layer),dtype='object')
     # Total area
     Area = sp.integrate(PDF,(z,0,np.inf))
     for j in range(num_layer):
         Area_i[j] = sp.integrate(PDF,(z,limit_low[j],limit_up[j]))
     weights = Area_i / Area
-    return weights
+    return weights,num_layer
 # Computing phase velocity by weighted average at each wavelength
 beta = (0.87+1.12*PR)/(1+PR)
 Vph = np.zeros((DC_points))
 for i in range(DC_points):
-    wp = weighting(Depth,Lambda[i])
-    Vph[i] = np.dot(beta*Vs,wp[i].flatten())
+    wp,num_layer = weighting(Depth,Lambda[i])
+    Vph[i] = np.dot(beta*Vs,wp.flatten())
     print(('WAVELENGTH{}---WEIGHTING = {}---PHASE VELOCITY = {}').format(i+1,wp,Vph[i]))
-fig,ax = plt.subplots(1,2,figsize=(6,6),dpi=100)
-ax[0].plot(Vph,Lambda,'-o',markerfacecolor='None')
+fig,ax = plt.subplots(1,2,figsize=(8,8),dpi=100)
+ax[0].plot(Vph,Lambda,'-bo',markerfacecolor='None')
 ax[0].invert_yaxis()
 ax[0].set_xlabel('Phase velocity, Vph [m/s]')
 ax[0].set_ylabel('Wavelength, [m]')
@@ -57,9 +58,7 @@ ax[0].xaxis.tick_top()
 ax[0].set_xlim(0,Vs[-1])
 ax[0].spines['bottom'].set_color('white')
 ax[0].spines['right'].set_color('white')
-# INVERSION
-# Srating from data from dispersion curve
-# Data include: Phase velocity, Wavelength, Alpha
+
 Alpha = 0.2
 Step_Z = 0
 Step_Vph = []
