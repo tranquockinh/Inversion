@@ -2,8 +2,8 @@ import numpy as np
 import sympy as sp
 import matplotlib.pyplot as plt
 # DISPERSION
-# DISPERSION
 Layer_Data = np.array([[100,5],
+                       [50,10],
                        [200,np.inf]])
 # Arrange vectors of shear wave velocity and depth
 Depth = np.append(0,Layer_Data[:,1])
@@ -47,6 +47,7 @@ Vph = np.zeros((DC_points))
 for i in range(DC_points):
     wp,num_layer = weighting(Depth,Lambda[i])
     Vph[i] = np.dot(beta*Vs,wp.flatten())
+
     print(('WAVELENGTH{}---WEIGHTING = {}---PHASE VELOCITY = {}').format(i+1,wp,Vph[i]))
 fig,ax = plt.subplots(1,2,figsize=(8,8),dpi=100)
 ax[0].plot(Vph,Lambda,'-bo',markerfacecolor='None')
@@ -58,8 +59,8 @@ ax[0].xaxis.tick_top()
 ax[0].set_xlim(0,Vs[-1])
 ax[0].spines['bottom'].set_color('white')
 ax[0].spines['right'].set_color('white')
-
-Alpha = 0.2
+# INVERSION
+Alpha = 0.1
 Step_Z = 0
 Step_Vph = []
 Vs = np.zeros((DC_points))
