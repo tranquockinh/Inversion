@@ -1,8 +1,18 @@
 import sympy as sp
+import tkinter
 import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 
+dispersionDATA = np.loadtxt('dispersiondata.txt', dtype='float', delimiter=None)
+Lambda,Vph = dispersionDATA[:,0],dispersionDATA[:,1]
 
+
+# Coefficients
+PR = 0.3
+beta = (0.87+1.12*PR)/(1+PR)
+
+# Compute weight factors
 def weighting(D,WL):
 	# Integral variable and limits
 	z = sp.symbols('z')
@@ -20,9 +30,28 @@ def weighting(D,WL):
 	# Total area
 	Area = sp.integrate(PDF,(z,0,np.inf))
 	for j in range(num_layer):
+		# Using integration
 		#Area_i[j] = sp.integrate(PDF,(z,limit_low[j],limit_up[j]))
+		# Simple anaysis
+
 		term1 = (cv1/(cv3/WL))*(sp.exp(cv3/WL*limit_up[j]) - sp.exp(cv3/WL*limit_low[j]))
 		term2 = (cv2/(cv4/WL))*(sp.exp(cv4/WL*limit_up[j]) - sp.exp(cv4/WL*limit_low[j]))
 		Area_i[j] = term1 + term2
 		weights = Area_i / Area
 	return weights
+	
+W = np.zeros((len(Lambda),len(Lambda)))
+for i in range(len(Lambda)):
+	Depth_array = 0.3*Lambda[:i+1]
+	Depth = np.append(0,Depth_array)
+	Depth[-1] = np.inf
+	weights = weighting(Depth,Lambda[i])
+	W[i,:i+1] = weights
+	if i != (len(Lambda)-1):	
+		print('------------------------> ok')
+	else:
+		print(('------------------------> finished'))
+
+np.savetxt('Weight_matrix.txt',W)
+print('weighting factor matrix saved with the name: "Weight_matrix"')
+print(W)

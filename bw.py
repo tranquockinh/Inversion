@@ -3,17 +3,16 @@ import tkinter
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-from weighting_func import weighting
 
 dispersionDATA = np.loadtxt('dispersiondata.txt', dtype='float', delimiter=None)
 Lambda,Vph = dispersionDATA[:,0],dispersionDATA[:,1]
+
 
 # Coefficients
 PR = 0.3
 beta = (0.87+1.12*PR)/(1+PR)
 
 # Compute weight factors
-'''
 def weighting(D,WL):
 	# Integral variable and limits
 	z = sp.symbols('z')
@@ -31,40 +30,41 @@ def weighting(D,WL):
 	# Total area
 	Area = sp.integrate(PDF,(z,0,np.inf))
 	for j in range(num_layer):
-		#Area_i[j] = sp.integrate(PDF,(z,limit_low[j],limit_up[j]))
-		term1 = (cv1/(cv3/WL))*(sp.exp(cv3/WL*limit_up[j]) - sp.exp(cv3/WL*limit_low[j]))
-		term2 = (cv2/(cv4/WL))*(sp.exp(cv4/WL*limit_up[j]) - sp.exp(cv4/WL*limit_low[j]))
-		Area_i[j] = term1 + term2
+		Area_i[j] = sp.integrate(PDF,(z,limit_low[j],limit_up[j]))
 		weights = Area_i / Area
 	return weights
-'''
-# 2 layer model
-num_layers = 2
-W = np.zeros((num_layers,num_layers))
-for i in range(num_layers):
-	Depth_array = 1 * Lambda[:num_layers]
-	Depth = np.append(0,Depth_array)
-	Depth[-1] = np.inf
-	weights = weighting(Depth,Lambda[i])
-	W[i,:] = weights
-print (np.matmul(np.linalg.inv(W),Vph[:num_layers]*(1/.93)))
+	
+	
+# Singular value decomposition
+def SVD(WEIGHT_MATRIX):
+    U,s,VT = np.linalg.svd(WEIGHT_MATRIX,full_matrices=False)
+    V = VT.T
+    UT = U.T
+    inv_s = np.linalg.inv(np.diag(s))
+    inv_A_SVD = np.dot(V,np.dot(inv_s,UT))
+    return U,s,VT,inv_A_SVD
+    
+    
+# #-Layer model
+numLayers_refine = len(Lambda)
+Bottoms = []
+for i in range(numLayers_refine):
+    Coeff = 1 
+    Current_bottom = Coeff*Lambda[i]
+    Bottoms = np.append(Bottoms,Current_bottom)
+Bottoms[-1] = np.inf # assume half-space
+Depths = np.append(0,Bottoms) # surface 
 
-
-
-
-
-'''
+WEIGHT_MATRIX = np.zeros((numLayers_refine,len(Lambda)))
 for i in range(len(Lambda)):
-	Depth_array = 0.3*Lambda[:i+1]
-	Depth = np.append(0,Depth_array)
-	Depth[-1] = np.inf
-	weights = weighting(Depth,Lambda[i])
-	W[i,:i+1] = weights
-	if i != (len(Lambda)-1):
-		print('------------------------> ok')
-	else:
-		print(('------------------------> finished'))
+    weights = weighting(Depths,Lambda[i])
+    WEIGHT_MATRIX[:,i] = weights
+    print(('WAVELENGTH {} PASSED').format(i+1))
+print(WEIGHT_MATRIX.T)
 
-np.savetxt('Weight_matrix.txt',W)
-print('weighting factor matrix saved with the name: "Weight_matrix"')
-'''
+# Reconstruction 
+U,s,VT,inv_A_SVD = SVD(WEIGHT_MATRIX)
+Vs = np.matmul(inv_A_SVD.T,Vph*(1/beta))
+print()
+print(Vs)
+
