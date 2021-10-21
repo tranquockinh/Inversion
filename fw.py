@@ -5,21 +5,22 @@ import matplotlib
 import matplotlib.pyplot as plt
 # DISPERSION
 
-Layer_Data = np.array([[100,2],                   
+Layer_Data = np.array([[100,2],
                        [150,6],
                        [200,10],
                        [400,np.inf]])
 
 # Define layer array (length N) and depth array (length N+1)
-numLayers = len(Layer_Data[:,0]) 
+numLayers = len(Layer_Data[:,0])
 Depth = np.append(0,Layer_Data[:,1])
 # Shear wave velocity (Vs)
 Vs = Layer_Data[:,0]
 # Poisson'a ratio
 PR = 0.3
 # Disire wavelength
-Lambda = np.array([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22])
-
+#Lambda = np.array([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22])
+Lambda = np.arange(2,44,3)
+DC_points = len(Lambda)
 # Compute weight factors
 def weighting(D,WL):
 	# Integral variable and limits
