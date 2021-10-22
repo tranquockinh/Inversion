@@ -8,7 +8,6 @@ Layer_Data = np.array([[150,2],
                        [200,5],
                        [250,10],
                        [400,np.inf]])
-
 # Arrange vectors of shear wave velocity and depth
 numLayers = len(Layer_Data[:,0])
 Depth = np.append(0,Layer_Data[:,1])
@@ -52,16 +51,14 @@ def weighting(D,WL):
     weights = Area_i / Area
     return weights
 # Computing phase velocity by weighted average at each wavelength
-
-def computeWeight(DC_points,numLayers,Depth,Vs):
-    Vph = np.zeros((DC_points))
+def computeWeight(DC_points,numLayers,Depth):
     WEIGHTS = np.zeros((DC_points,numLayers))
     for i in range(DC_points):
         weights = weighting(Depth,Lambda[i])
         #Vph[i] = np.dot(Vs,weights.flatten()) * beta
         WEIGHTS[i,:] = weights
     return WEIGHTS
-WEIGHTS = computeWeight(DC_points,numLayers,Depth,Vs)
+WEIGHTS = computeWeight(DC_points,numLayers,Depth)
 
 def SVD(WEIGHT_MATRIX):
     U,s,VT = np.linalg.svd(WEIGHT_MATRIX,full_matrices=False)
@@ -111,25 +108,29 @@ def Forward(weightMatrix, Vs):
     # ax.spines['right'].set_color('white')
     # plt.show()
     return Vph
-
 Vph = Forward(WEIGHTS,Vs)
-def CheckPoint(numLayerRefine, Vph):
-    numWavelength = numLayerRefine
+print('original Vph: \n', Vph)
+
+def CheckPoint(numLayerRefine,Vph,Lambda):
+    numWavelength = len(Lambda)
     layerRefineSet = newLayerArray(numLayerRefine)
     useVph = []
     convertVs = []
     for i in range(numLayerRefine):
-        useVph.append(Vph[i])
+        useVph.append(Vph[i]*(1/beta))
+    for i in range(numWavelength):
         convertVs.append(Vph[i] * (1/beta))
-    newWeightMatrix = computeWeight(numLayerRefine,numWavelength,\
-    layerRefineSet,convertVs)
+    newWeightMatrix = computeWeight(numWavelength,numLayerRefine,layerRefineSet)
     plotTable(newWeightMatrix)
     regetWeight,invertWeight = SVD(newWeightMatrix)
-    newVs = np.matmul(invertWeight, convertVs)
-    return newWeightMatrix,newVs,useVph
-newWeightMatrix,newVs,useVph = CheckPoint(2, Vph)
-print(newWeightMatrix)
+    newVph = Forward(newWeightMatrix,useVph)
+    newVs = np.matmul(invertWeight,convertVs)
+    return newWeightMatrix,newVph,newVs
 
+newWeightMatrix,newph,newVs = CheckPoint(2, Vph, Lambda)
+print(newWeightMatrix)
+print('original Vph: \n', newph)
+print(newVs)
 
 # numLayers_refine = 6
 # Bottoms = []
