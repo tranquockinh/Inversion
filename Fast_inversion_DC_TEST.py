@@ -121,14 +121,14 @@ def CheckPoint(numLayerRefine, Vph):
     for i in range(numLayerRefine):
         useVph.append(Vph[i])
         convertVs.append(Vph[i] * (1/beta))
-    newWeightMatrix = computeWeight(numLayerRefine,numWavelength,layerRefineSet,convertVs)
+    newWeightMatrix = computeWeight(numLayerRefine,numWavelength,\
+    layerRefineSet,convertVs)
     plotTable(newWeightMatrix)
     regetWeight,invertWeight = SVD(newWeightMatrix)
     newVs = np.matmul(invertWeight, convertVs)
     return newWeightMatrix,newVs,useVph
-newWeightMatrix,newVs,useVph = CheckPoint(3, Vph)
-print(newVs)
-print(useVph)
+newWeightMatrix,newVs,useVph = CheckPoint(2, Vph)
+print(newWeightMatrix)
 
 
 # numLayers_refine = 6
@@ -150,7 +150,6 @@ print(useVph)
 # print(WEIGHT_MATRIX)
 
 
-#
 # # Show weight matrix
 # fig,ax = plt.subplots(figsize=(2,1))
 # ax.matshow(WEIGHT_MATRIX, cmap=plt.cm.Blues)
