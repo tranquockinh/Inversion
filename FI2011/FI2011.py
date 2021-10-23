@@ -1,3 +1,5 @@
+#Tocken: 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
+
 import numpy as np
 import sympy as sp
 import tkinter
@@ -10,7 +12,7 @@ Layer_Data = np.array([[150,2],
                        [200,5],
                        [250,10],
                        [400,np.inf]])
-Lambda = np.arange(2,41,3)
+Lambda = np.arange(2,54,3)
 
 def dataInput(soilProfile, desiredWavelength):
     numLayers = len(soilProfile[:,0])
@@ -70,6 +72,14 @@ def plotTable(weightMatrix,index = 'Lambda {}',columns = 'Layer {}'):
     print('\nForwad computation:\n', \
     DataFrame(weightMatrix, index = lambdaLabels, columns = layerLabels))
 
+def Forward(weightMatrix, Vs):
+    Vph = []
+    for i in range(len(weightMatrix[:,0])):
+        Weightings = weightMatrix[i,:]
+        Vph.append(np.dot(Weightings, Vs)*beta)
+    return Vph
+Vph = Forward(WEIGHTS, Vs)
+
 def newLayerArray(numLayerArray):
     Alpha = 0.3
     convertDepth = Alpha * Lambda
@@ -85,25 +95,6 @@ def newLayerArray(numLayerArray):
     return newLayerSet
 newLayerSet = newLayerArray(len(Lambda))
 
-def Forward(weightMatrix, Vs):
-    Vph = []
-    for i in range(len(weightMatrix[:,0])):
-        Weightings = weightMatrix[i,:]
-        Vph.append(np.dot(Weightings, Vs)*beta)
-    fig,ax = plt.subplots(figsize=(5,6),dpi=100)
-    ax.plot(Vph,Lambda,'-bo',markerfacecolor='None')
-    ax.invert_yaxis()
-    ax.set_xlabel('Phase velocity, Vph [m/s]')
-    ax.set_ylabel('Wavelength, [m]')
-    ax.xaxis.set_label_position('top')
-    ax.xaxis.tick_top()
-    # ax.set_xlim(0,Vs[-1])
-    # ax.spines['bottom'].set_color('white')
-    # ax.spines['right'].set_color('white')
-    # plt.show()
-    return Vph
-Vph = Forward(WEIGHTS, Vs)
-
 def initializing(Lambda):
     newWeightMatrix = np.zeros((len(Lambda),len(Lambda)))
     for i in range(len(Lambda)):
@@ -118,24 +109,46 @@ def initializing(Lambda):
 newWeightMatrix = initializing(Lambda)
 plotTable(newWeightMatrix,index = 'Lambda {}',columns = 'Layer {}')
 
-def Inversion(newWeightMatrix,Vph,Lambda):
+def InversionInit(newWeightMatrix,Vph,Lambda):
     newLayerSet = newLayerArray(len(Lambda))
     regetWeight,invertWeight = SVD(newWeightMatrix)
     initialVs = (1/beta) * np.matmul(invertWeight,Vph)
-    initData = np.zeros((len(initialVs),4))
-    convertVs = []
-    initDataVs = []
-    Difference = []
-    initDataDepth = []
+    Data = np.zeros((len(initialVs),4))
+    convertVs,initDataVs,Difference,initDataDepth = [],[],[],[]
     for i in range(len(initialVs)):
         convertVs.append(Vph[i] * (1/beta))
         initDataVs.append(initialVs[i])
         Difference.append(initDataVs[i] - convertVs[i])
         initDataDepth.append(newLayerSet[1:][i])
-    initData[:,0] = convertVs
-    initData[:,1] = initDataVs
-    initData[:,2] = Difference
-    initData[:,3] = initDataDepth
-    return initData
-initData = Inversion(newWeightMatrix,Vph,Lambda)
-plotTable(initData,index = 'Layer depth {}',columns = 'Data {}')
+    Data[:,0] = initDataVs
+    Data[:,1] = initDataDepth
+    Data[:,2] = convertVs
+    Data[:,3] = Difference
+    initialDataProfile = Data[:,:2]
+    plotTable(Data,index = 'Layer depth {}',columns = 'Data {}')
+    return initialDataProfile
+initialDataProfile = InversionInit(newWeightMatrix,Vph,Lambda)
+
+def TestDispersion(initialDataProfile):
+    numLayers,Depth,Vs,DC_points = dataInput(initialDataProfile,Lambda)
+    WeightingMatrix = computeWeight(DC_points,numLayers,Depth)
+    regetWeight,invertWeight = SVD(WeightingMatrix)
+    ShearWaveVeloc = Forward(WeightingMatrix, Vs)
+    print(ShearWaveVeloc)
+    return ShearWaveVeloc,initialDataProfile
+ShearWaveVeloc,initialDataProfile = TestDispersion(initialDataProfile)
+
+def plot():
+    fig,ax = plt.subplots(figsize=(5,6),dpi=100)
+    ax.plot(Vph,Lambda,'-bo',markerfacecolor='None')
+    ax.plot(ShearWaveVeloc,Lambda,'-ro',markerfacecolor='None')
+    ax.invert_yaxis()
+    ax.set_xlabel('Phase velocity, Vph [m/s]')
+    ax.set_ylabel('Wavelength, [m]')
+    ax.xaxis.set_label_position('top')
+    ax.xaxis.tick_top()
+    # ax.set_xlim(0,Vs[-1])
+    # ax.spines['bottom'].set_color('white')
+    # ax.spines['right'].set_color('white')
+    plt.show()
+plot()
