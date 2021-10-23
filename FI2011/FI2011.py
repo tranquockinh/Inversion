@@ -67,13 +67,14 @@ def SVD(WEIGHT_MATRIX):
     invertWeight = np.dot(V,np.dot(inv_s,UT))
     return regetWeight,invertWeight
 
-def plotTable(weightMatrix):
+def plotTable(weightMatrix,index = 'Lambda {}',columns = 'Layer {}'):
     lambdaLabels = []
     layerLabels = []
     for i in range(len(weightMatrix[:,0])):
-        lambdaLabels.append('Lambda {}'.format(i+1))
+        # lambdaLabels.append('Lambda {}'.format(i+1))
+        lambdaLabels.append(index.format(i+1))
     for j in range(len(weightMatrix[0,:])):
-        layerLabels.append('Layer {}'.format(j+1))
+        layerLabels.append(columns.format(j+1))
     print('\nForwad computation weight:\n', \
     DataFrame(weightMatrix, index = lambdaLabels, columns = layerLabels))
 
@@ -105,7 +106,7 @@ def Forward(weightMatrix, Vs):
     # ax.set_xlim(0,Vs[-1])
     # ax.spines['bottom'].set_color('white')
     # ax.spines['right'].set_color('white')
-    plt.show()
+    # plt.show()
     return Vph
 Vph = Forward(WEIGHTS, Vs)
 
@@ -122,8 +123,17 @@ def initializing(Lambda):
         newWeightMatrix[i,:i+1] = temp[0:]
         #newWeightMatrix[i][:i] = temp
     return newWeightMatrix
-newWeightMatrix = initializing(Lambda)
-plotTable(newWeightMatrix)
 
-def Inversion(newWeightMatrix):
+newWeightMatrix = initializing(Lambda)
+plotTable(newWeightMatrix,index = 'Lambda {}',columns = 'Layer {}')
+
+def Inversion(newWeightMatrix,Vph,Lambda):
+    newLayerSet = newLayerArray(len(Lambda))
     regetWeight,invertWeight = SVD(newWeightMatrix)
+    initialVs = (1/beta) * np.matmul(invertWeight,Vph)
+    newProfile = np.zeros((len(initialVs),2))
+
+    print('initializing stage, solve for initial Vs: \n', initialVs[:,np.newaxis][:])
+    print((newLayerSet),len(initialVs),len(Lambda))
+    return initialVs, newLayerSet
+initialVs, newLayerSet = Inversion(newWeightMatrix,Vph,Lambda)

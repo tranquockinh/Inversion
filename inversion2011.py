@@ -33,7 +33,7 @@ def weighting(D,WL):
 		Area_i[j] = sp.integrate(PDF,(z,limit_low[j],limit_up[j]))
 		weights = Area_i / Area
 	return weights
-	
+
 W = np.zeros((len(Lambda),len(Lambda)))
 for i in range(len(Lambda)):
 	Depth_array = 0.3*Lambda[:i+1]
@@ -41,11 +41,10 @@ for i in range(len(Lambda)):
 	Depth[-1] = np.inf
 	weights = weighting(Depth,Lambda[i])
 	W[i,:i+1] = weights
-	if i != (len(Lambda)-1):	
+	if i != (len(Lambda)-1):
 		print('------------------------> ok')
 	else:
 		print(('------------------------> finished'))
 
 np.savetxt('Weight_matrix.txt',W)
 print('weighting factor matrix saved with the name: "Weight_matrix"')
-
