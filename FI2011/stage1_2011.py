@@ -4,12 +4,13 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-dispersionDATA = np.loadtxt('dispersiondata.txt', dtype='float', delimiter=None)
-Lambda,Vph = dispersionDATA[:,0],dispersionDATA[:,1]
+# dispersionDATA = np.loadtxt('dispersiondata.txt', dtype='float', delimiter=None)
+# Lambda,Vph = dispersionDATA[:,0],dispersionDATA[:,1]
 # Coefficients
 PR = 0.3
 beta = (0.87+1.12*PR)/(1+PR)
-
+Lambda = np.arange(2,44,3)
+DC_points = len(Lambda)
 # Compute weight factors
 def weighting(D,WL):
 	# Integral variable and limits
@@ -38,11 +39,13 @@ def weighting(D,WL):
 		weights = Area_i / Area
 	return weights
 W = np.zeros((len(Lambda),len(Lambda)))
+
 for i in range(len(Lambda)):
+
 	Depth_array = Lambda[:i+1]
-	Depth = np.append(0,Depth_array)
-	Depth[-1] = np.inf
-	weights = weighting(Depth,Lambda[i])
+	Depth_array = np.append(0,Depth_array)
+	Depth_array[-1] = np.inf
+	weights = weighting(Depth_array,Lambda[i])
 	W[i,:i+1] = weights
 
 def SVD(WEIGHT_MATRIX):

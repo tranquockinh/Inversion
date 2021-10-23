@@ -3,41 +3,34 @@ import sympy as sp
 import tkinter
 import matplotlib.pyplot as plt
 from pandas import *
-# DISPERSION
 
-Layer_Data = np.array([[100,2],
-                       [150,6],
-                       [200,10],
-                       [400,np.inf]])
-# Define layer array (length N) and depth array (length N+1)
-numLayers = len(Layer_Data[:,0])
-Depth = np.append(0,Layer_Data[:,1])
-# Shear wave velocity (Vs)
-Vs = Layer_Data[:,0]
-# Poisson'a ratio
-PR = 0.3
+PR = 0.3 # Poisson'a ratio
 beta = (0.87+1.12*PR)/(1+PR)
-# Disire wavelength
-#Lambda = np.array([2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22])
-Lambda = np.arange(2,44,3)
-DC_points = len(Lambda)
-# Compute weight factors
+Layer_Data = np.array([[150,2],
+                       [200,5],
+                       [250,10],
+                       [400,np.inf]])
+Lambda = np.arange(2,41,3)
+
+def dataInput(soilProfile, desiredWavelength):
+    numLayers = len(soilProfile[:,0])
+    DC_points = len(desiredWavelength)
+    Depth =np.append(0, soilProfile[:,1])
+    Vs = soilProfile[:,0]
+    return numLayers,Depth,Vs, DC_points
+
+numLayers,Depth,Vs,DC_points = dataInput(Layer_Data,Lambda)
+
 def weighting(D,WL):
-	# Integral variable and limits
 	z = sp.symbols('z')
 	limit_low = D[:-1]
 	limit_up = D[1:]
 	material_coefficient = 1
-	# Coefficients of vertical particle displacement function
 	cv = np.array([0.2507, -0.4341, -0.8474*2*np.pi,-0.3933*2*np.pi])
 	cv1,cv2,cv3,cv4 = cv[0],cv[1],cv[2],cv[3]
-	# Particle displacement function
 	PDF = (cv1*sp.exp(cv3/WL*z) + cv2*sp.exp(cv4/WL*z))*material_coefficient
-	# Loop to compute weight at the wavelength given
 	num_layer = len(D) - 1
 	Area_i = np.zeros((num_layer),dtype='object')
-	# Total area
-	#Area = sp.integrate(PDF,(z,0,np.inf))
 	A_term1 = (cv1/(cv3/WL))*(sp.exp(cv3/WL*np.inf) - sp.exp(cv3/WL*0))
 	A_term2 = (cv2/(cv4/WL))*(sp.exp(cv4/WL*np.inf) - sp.exp(cv4/WL*0))
 	Area = A_term1 + A_term2
@@ -53,7 +46,6 @@ def computeWeight(DC_points,numLayers,Depth):
     WEIGHTS = np.zeros((DC_points,numLayers))
     for i in range(DC_points):
         weights = weighting(Depth,Lambda[i])
-        #Vph[i] = np.dot(Vs,weights.flatten()) * beta
         WEIGHTS[i,:] = weights
     return WEIGHTS
 WEIGHTS = computeWeight(DC_points,numLayers,Depth)
@@ -75,21 +67,23 @@ def plotTable(weightMatrix,index = 'Lambda {}',columns = 'Layer {}'):
         lambdaLabels.append(index.format(i+1))
     for j in range(len(weightMatrix[0,:])):
         layerLabels.append(columns.format(j+1))
-    print('\nForwad computation weight:\n', \
+    print('\nForwad computation:\n', \
     DataFrame(weightMatrix, index = lambdaLabels, columns = layerLabels))
 
 def newLayerArray(numLayerArray):
+    Alpha = 0.3
+    convertDepth = Alpha * Lambda
     newLayerSet = []
-    #for i in range(len(Lambda) + 1):
-    for i in range(numLayerArray+1):
+    for i in range(numLayerArray):
         if i == 0:
             newLayerSet.append(i)
-            newLayerSet.append(Lambda[i])
-        elif i == (numLayerArray):
+            newLayerSet.append(convertDepth[i])
+        elif i == (numLayerArray - 1):
             newLayerSet.append(np.inf)
         else:
-            newLayerSet.append(Lambda[i])
+            newLayerSet.append(convertDepth[i])
     return newLayerSet
+newLayerSet = newLayerArray(len(Lambda))
 
 def Forward(weightMatrix, Vs):
     Vph = []
@@ -114,16 +108,13 @@ def initializing(Lambda):
     newWeightMatrix = np.zeros((len(Lambda),len(Lambda)))
     for i in range(len(Lambda)):
         if i == 0:
-            newLayerSet = newLayerArray(i)
-            newLayerSet[-1] = np.inf
+            newLayerSet = newLayerArray(i+1)
         else:
-            newLayerSet = newLayerArray(i)
-        #for j in range(i+1):
+            newLayerSet = newLayerArray(i+1)
+        newLayerSet[-1] = np.inf
         temp = weighting(newLayerSet,Lambda[i])
         newWeightMatrix[i,:i+1] = temp[0:]
-        #newWeightMatrix[i][:i] = temp
     return newWeightMatrix
-
 newWeightMatrix = initializing(Lambda)
 plotTable(newWeightMatrix,index = 'Lambda {}',columns = 'Layer {}')
 
@@ -131,9 +122,20 @@ def Inversion(newWeightMatrix,Vph,Lambda):
     newLayerSet = newLayerArray(len(Lambda))
     regetWeight,invertWeight = SVD(newWeightMatrix)
     initialVs = (1/beta) * np.matmul(invertWeight,Vph)
-    newProfile = np.zeros((len(initialVs),2))
-
-    print('initializing stage, solve for initial Vs: \n', initialVs[:,np.newaxis][:])
-    print((newLayerSet),len(initialVs),len(Lambda))
-    return initialVs, newLayerSet
-initialVs, newLayerSet = Inversion(newWeightMatrix,Vph,Lambda)
+    initData = np.zeros((len(initialVs),4))
+    convertVs = []
+    initDataVs = []
+    Difference = []
+    initDataDepth = []
+    for i in range(len(initialVs)):
+        convertVs.append(Vph[i] * (1/beta))
+        initDataVs.append(initialVs[i])
+        Difference.append(initDataVs[i] - convertVs[i])
+        initDataDepth.append(newLayerSet[1:][i])
+    initData[:,0] = convertVs
+    initData[:,1] = initDataVs
+    initData[:,2] = Difference
+    initData[:,3] = initDataDepth
+    return initData
+initData = Inversion(newWeightMatrix,Vph,Lambda)
+plotTable(initData,index = 'Layer depth {}',columns = 'Data {}')
