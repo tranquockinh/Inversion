@@ -19,8 +19,7 @@ def dataInput(soilProfile, desiredWavelength):
     DC_points = len(desiredWavelength)
     Depth =np.append(0, soilProfile[:,1])
     Vs = soilProfile[:,0]
-    return numLayers,Depth,Vs, DC_points
-
+    return numLayers,Depth,Vs,DC_points
 numLayers,Depth,Vs,DC_points = dataInput(Layer_Data,Lambda)
 
 def weighting(D,WL):
@@ -129,19 +128,35 @@ def InversionInit(newWeightMatrix,Vph,Lambda):
     return initialDataProfile
 initialDataProfile = InversionInit(newWeightMatrix,Vph,Lambda)
 
-def TestDispersion(initialDataProfile):
+def TestDispersion(Vph,initialDataProfile):
     numLayers,Depth,Vs,DC_points = dataInput(initialDataProfile,Lambda)
     WeightingMatrix = computeWeight(DC_points,numLayers,Depth)
     regetWeight,invertWeight = SVD(WeightingMatrix)
-    ShearWaveVeloc = Forward(WeightingMatrix, Vs)
+    reducedVs = []
+    for i in range(len(Vs)):
+        reducedVs.append(0.2 * Vs[i] + 0.8 * (1/beta) * Vph[i])
+    ShearWaveVeloc = Forward(WeightingMatrix, reducedVs)
     print(ShearWaveVeloc)
+    # plotTable(ShearWaveVeloc,index = 'Lambda {}',columns = 'Layer {}')
     return ShearWaveVeloc,initialDataProfile
-ShearWaveVeloc,initialDataProfile = TestDispersion(initialDataProfile)
+ShearWaveVeloc,initialDataProfile = TestDispersion(Vph,initialDataProfile)
+
 
 def plot():
     fig,ax = plt.subplots(figsize=(5,6),dpi=100)
-    ax.plot(Vph,Lambda,'-bo',markerfacecolor='None')
-    ax.plot(ShearWaveVeloc,Lambda,'-ro',markerfacecolor='None')
+    numLayers,Depth,Vs,DC_points = dataInput(Layer_Data,Lambda)
+    VsPlot = np.append(Vs,Vs[-1])
+    Depth[-1] = Depth[-2] + 5
+    ax.step(VsPlot,Depth)
+    numLayers,Depth,Vs,DC_points = dataInput(initialDataProfile,Lambda)
+    VsPlot = np.append(Vs,Vs[-1])
+    Depth[-1] = Depth[-2] + 1
+    ax.step(VsPlot,Depth)
+    
+    '''
+    ax.plot(Vph,newLayerSet[1:],'-bo',markerfacecolor='None')
+    ax.plot(ShearWaveVeloc,newLayerSet[1:],'-ro',markerfacecolor='None')
+    '''
     ax.invert_yaxis()
     ax.set_xlabel('Phase velocity, Vph [m/s]')
     ax.set_ylabel('Wavelength, [m]')
