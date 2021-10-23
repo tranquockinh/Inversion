@@ -60,7 +60,7 @@ def SVD(WEIGHT_MATRIX):
     invertWeight = np.dot(V,np.dot(inv_s,UT))
     return regetWeight,invertWeight
 
-def plotTable(weightMatrix,index = 'Lambda {}',columns = 'Layer {}'):
+def plotTable(weightMatrix,index ='Lambda {}',columns='Layer {}',Name = 'Table name'):
     lambdaLabels = []
     layerLabels = []
     for i in range(len(weightMatrix[:,0])):
@@ -68,8 +68,9 @@ def plotTable(weightMatrix,index = 'Lambda {}',columns = 'Layer {}'):
         lambdaLabels.append(index.format(i+1))
     for j in range(len(weightMatrix[0,:])):
         layerLabels.append(columns.format(j+1))
-    print('\nForwad computation:\n', \
-    DataFrame(weightMatrix, index = lambdaLabels, columns = layerLabels))
+    df = DataFrame(weightMatrix,index=Index(lambdaLabels, name=Name),columns=layerLabels)
+    df.style
+    print('\nForwad computation:\n', df)
 
 def Forward(weightMatrix, Vs):
     Vph = []
@@ -87,10 +88,8 @@ def newLayerArray(numLayerArray):
         if i == 0:
             newLayerSet.append(i)
             newLayerSet.append(convertDepth[i])
-        elif i == (numLayerArray - 1):
-            newLayerSet.append(np.inf)
-        else:
-            newLayerSet.append(convertDepth[i])
+        elif i == (numLayerArray - 1): newLayerSet.append(np.inf)
+        else: newLayerSet.append(convertDepth[i])
     return newLayerSet
 newLayerSet = newLayerArray(len(Lambda))
 
@@ -99,14 +98,13 @@ def initializing(Lambda):
     for i in range(len(Lambda)):
         if i == 0:
             newLayerSet = newLayerArray(i+1)
-        else:
-            newLayerSet = newLayerArray(i+1)
+        else: newLayerSet = newLayerArray(i+1)
         newLayerSet[-1] = np.inf
         temp = weighting(newLayerSet,Lambda[i])
         newWeightMatrix[i,:i+1] = temp[0:]
     return newWeightMatrix
 newWeightMatrix = initializing(Lambda)
-plotTable(newWeightMatrix,index = 'Lambda {}',columns = 'Layer {}')
+plotTable(newWeightMatrix,index = 'Lambda {}',columns = 'Layer {}',Name='Stepdown weight')
 
 def InversionInit(newWeightMatrix,Vph,Lambda):
     newLayerSet = newLayerArray(len(Lambda))
@@ -124,24 +122,30 @@ def InversionInit(newWeightMatrix,Vph,Lambda):
     Data[:,2] = convertVs
     Data[:,3] = Difference
     initialDataProfile = Data[:,:2]
-    plotTable(Data,index = 'Layer depth {}',columns = 'Data {}')
-    return initialDataProfile
-initialDataProfile = InversionInit(newWeightMatrix,Vph,Lambda)
+    plotTable(Data,index = 'Layer depth {}',columns = 'Data {}',Name='Data for adjusting')
+    # plotTable(invertWeight,index = 'Layer depth {}',columns = 'Data {}',Name='Invert weight matrix')
+    return invertWeight,initialDataProfile
 
-def TestDispersion(Vph,initialDataProfile):
+def cutOffData(newWeightMatrix,Vph,Lambda):
+    invertWeight,initialDataProfile = InversionInit(newWeightMatrix,Vph,Lambda)
     numLayers,Depth,Vs,DC_points = dataInput(initialDataProfile,Lambda)
-    WeightingMatrix = computeWeight(DC_points,numLayers,Depth)
-    regetWeight,invertWeight = SVD(WeightingMatrix)
-    reducedVs = []
-    for i in range(len(Vs)):
-        reducedVs.append(0.2 * Vs[i] + 0.8 * (1/beta) * Vph[i])
-    ShearWaveVeloc = Forward(WeightingMatrix, reducedVs)
+    firstLayerVs = initialDataProfile[0,0]
+    willAdjustVs = initialDataProfile[1:,0]
+    invertWeightCutOff = invertWeight[1:,:]
+    # plotTable(invertWeightCutOff,index = 'Layer depth {}',columns = 'Data {}',Name='Invert weight cutoff')
+    return firstLayerVs,willAdjustVs,invertWeightCutOff
+
+def TestDispersion(newWeightMatrix,Vph,Lambda):
+    firstLayerVs,willAdjustVs,invertWeightCutOff = cutOffData(newWeightMatrix,Vph,Lambda)
+    ShearWaveVeloc = []
+    ShearWaveVeloc.append(firstLayerVs)
+    ShearWaveVeloc.append(np.matmul(invertWeightCutOff,willAdjustVs))
     print(ShearWaveVeloc)
     # plotTable(ShearWaveVeloc,index = 'Lambda {}',columns = 'Layer {}')
     return ShearWaveVeloc,initialDataProfile
 ShearWaveVeloc,initialDataProfile = TestDispersion(Vph,initialDataProfile)
 
-
+'''
 def plot():
     fig,ax = plt.subplots(figsize=(5,6),dpi=100)
     numLayers,Depth,Vs,DC_points = dataInput(Layer_Data,Lambda)
@@ -152,11 +156,11 @@ def plot():
     VsPlot = np.append(Vs,Vs[-1])
     Depth[-1] = Depth[-2] + 1
     ax.step(VsPlot,Depth)
-    
-    '''
-    ax.plot(Vph,newLayerSet[1:],'-bo',markerfacecolor='None')
-    ax.plot(ShearWaveVeloc,newLayerSet[1:],'-ro',markerfacecolor='None')
-    '''
+
+
+    # ax.plot(Vph,newLayerSet[1:],'-bo',markerfacecolor='None')
+    # ax.plot(ShearWaveVeloc,newLayerSet[1:],'-ro',markerfacecolor='None')
+
     ax.invert_yaxis()
     ax.set_xlabel('Phase velocity, Vph [m/s]')
     ax.set_ylabel('Wavelength, [m]')
@@ -167,3 +171,4 @@ def plot():
     # ax.spines['right'].set_color('white')
     plt.show()
 plot()
+'''
