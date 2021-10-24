@@ -1,50 +1,97 @@
 import numpy as np
 import sympy as sp
 import tkinter
-import matplotlib
 import matplotlib.pyplot as plt
-# DISPERSION
+from pandas import *
 
-Layer_Data = np.array([[200,5],
-                       [300,10],
+PR = 0.3 # Poisson'a ratio
+beta = (0.87+1.12*PR)/(1+PR)
+
+Layer_Data = np.array([[150,5],
+                       [200,10],
+                       [250,30],
                        [400,np.inf]])
-
-# Model parameters
-nLayers = len(Layer_Data[:,0])
-Depth = np.append(0,Layer_Data[:,1])
-Vs = Layer_Data[:,0]
-# Convert shear wave velocity to phase velocity
-nuy = 0.3
-fv = (0.87 + 1.12*nuy) / (1 + nuy)
-Vph_converted = Layer_Data[:,0] * (fv)
-# Assume a range of wavelength Lambda
-Lambda = sp.Matrix([10,11,12,13,14,15])
-
+waveLength0 = 4
+deltaWaveLength = 2
+def dataInput(soilProfile):
+    numLayers = len(soilProfile[:,0])
+    Depth =np.append(0, soilProfile[:,1])
+    Vs = soilProfile[:,0]
+    return numLayers,Depth,Vs
+numLayers,Depth,Vs = dataInput(Layer_Data)
 # Compute weighting factor using weighting function
-def weighting(D,Lambdai):
-    D[-1] = Lambda[-1]
-    nLayers = len(D) - 1
-    limit_low = D[:-1]
-    limit_up = D[1:]
 
+def plotTable(weightMatrix,index ='Lambda {}',columns='Layer {}',Name = 'Table name'):
+    lambdaLabels = []
+    layerLabels = []
+    for i in range(len(weightMatrix[:,0])):
+        lambdaLabels.append(index.format(i+1))
+    for j in range(len(weightMatrix[0,:])):
+        layerLabels.append(columns.format(j+1))
+    df = DataFrame(weightMatrix,index=Index(lambdaLabels, name=Name),columns=layerLabels)
+    df.style
+    print(df)
+
+def weighting(Depth,Wavelength):
+    numLayers = len(Depth) - 1
     z = sp.symbols('z')
-    PDF = 1 - (z/Lambdai) ** (3/2)
-    int_PDF = z - (2/5) * ((z/Lambdai)**(5/2)) * Lambdai
-    Area_i = np.zeros((nLayers),dtype='object')
-    # Total area
-    Area = int_PDF.subs({z:Lambdai}) - int_PDF.subs({z:0})
-    for j in range(nLayers):
-        Area_i[j] = int_PDF.subs({z:limit_up[j]}) - int_PDF.subs({z:limit_low[j]})
-        weights = Area_i / Area
-    return weights
-# Compute weighting factor matrix
-Vph = np.zeros((len(Lambda)))
-WEIGHTS = np.zeros((nLayers,len(Lambda)))
-for i in range(len(Lambda)):
-	weights = weighting(Depth,Lambda[i])
-	print('PASS LAMBDA [{}]'.format(i+1))
-	WEIGHTS[:,i] = weights
-	Vph[i] = np.dot(fv*Vs,weights.flatten())
-print()
-print('weighting factor matrix\n',WEIGHTS.T)
+    limit_low = Depth[:-1]
+    limit_up = Depth[1:]
+    integralPDF = z - (2/5) * ((z/Wavelength)**(5/2)) * Wavelength
+    layerArea = np.zeros((numLayers),dtype='object')
+    Area = integralPDF.subs({z:Wavelength}) - integralPDF.subs({z:0})
+    for i in range(numLayers):
+        if limit_up[i] <= Wavelength:
+            layerArea[i] = integralPDF.subs({z:limit_up[i]}) - integralPDF.subs({z:limit_low[i]})
+        else:
+            layerArea[i] = integralPDF.subs({z:Wavelength}) - integralPDF.subs({z:limit_low[i]})
+            break
+    weights = layerArea/Area
+    return layerArea,weights
 
+def computeWeight(numLayers,Depth,waveLength0,deltaWaveLength):
+    Lambda = np.arange(waveLength0,Depth[-2]+2*deltaWaveLength,deltaWaveLength)
+    DC_points = len(Lambda)
+    WEIGHTS = np.zeros((DC_points,numLayers))
+    for i in range(DC_points):
+        layerArea,weights = weighting(Depth,Lambda[i])
+        WEIGHTS[i,:] = weights
+    print(WEIGHTS)
+    return Lambda,WEIGHTS
+Lambda,WEIGHTS = computeWeight(numLayers,Depth,waveLength0,deltaWaveLength)
+Vph = 0.93*np.matmul(WEIGHTS,Vs)
+print(Vph)
+
+fig,ax = plt.subplots(figsize = (4,6),dpi=100)
+ax.plot(Vph,Lambda)
+ax.invert_yaxis()
+ax.set_xlabel('Normalized vertical displacement')
+ax.set_ylabel('Wavelength, (m)')
+ax.xaxis.set_label_position('top')
+ax.xaxis.tick_top()
+plt.show()
+
+'''
+def plotParticleDispl(refineDepth,atWavelength):
+    layerArea,fineWeight = weighting(refineDepth,atWavelength)
+    plotData = np.zeros((len(layerArea),2))
+
+    for i in range(len(layerArea)):
+        plotData[:,0] = refineDepth[1:]
+        plotData[:,1] = fineWeight/fineWeight[0]
+    plotTable(plotData,index ='Refine depth {}',columns='Displ. {}',Name ='Displ. distribution')
+    fig,ax = plt.subplots(figsize = (4,6),dpi=100)
+    ax.plot(plotData[:,1],plotData[:,0])
+    return fig,ax
+
+refineDepth = np.arange(0,10.0,0.5)
+Depth[-1] = np.inf
+atWavelength = 10
+fig,ax = plotParticleDispl(refineDepth,atWavelength)
+ax.invert_yaxis()
+ax.set_xlabel('Normalized vertical displacement')
+ax.set_ylabel('refined depth, (m)')
+ax.xaxis.set_label_position('top')
+ax.xaxis.tick_top()
+plt.show()
+'''
