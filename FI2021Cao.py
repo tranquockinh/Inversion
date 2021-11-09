@@ -7,11 +7,18 @@ from pandas import *
 
 PR = 0.3 # Poisson'a ratio
 beta = (0.87+1.12*PR)/(1+PR)
-Layer_Data = np.array([[150,6],
+
+# Layer_Data = np.array([[150,5],
+#                        [400,np.inf]])
+Layer_Data = np.array([[150,2],
+                       [200,5],
+                       [250,10],
                        [400,np.inf]])
-waveLength0 = 3
+
+# Lambda = np.arange(2,50,2)
+waveLength0 = 2
 deltaWaveLength = 2
-Lambda = np.arange(waveLength0,44,deltaWaveLength)
+Lambda = np.arange(waveLength0,45,deltaWaveLength)
 def dataInput(soilProfile,desiredWavelength):
     numLayers = len(soilProfile[:,0])
     DC_points = len(desiredWavelength)
@@ -19,6 +26,7 @@ def dataInput(soilProfile,desiredWavelength):
     Vs = soilProfile[:,0]
     return numLayers,Depth,Vs,DC_points
 numLayers,Depth,Vs,DC_points = dataInput(Layer_Data,Lambda)
+
 
 def plotTable(weightMatrix,index ='Lambda {}',columns='Layer {}',Name = 'Table name'):
     lambdaLabels = []
@@ -49,10 +57,12 @@ def weighting(D,WL):
     num_layer = len(D) - 1
     Area_i = np.zeros((num_layer),dtype='object')
     # Total area
+    #Area = sp.integrate(PDF,(z,0,np.inf))
     A_term1 = (cv1/(cv3/WL))*(sp.exp(cv3/WL*np.inf) - sp.exp(cv3/WL*0))
     A_term2 = (cv2/(cv4/WL))*(sp.exp(cv4/WL*np.inf) - sp.exp(cv4/WL*0))
     Area = A_term1 + A_term2
     for j in range(num_layer):
+        #Area_i[j] = sp.integrate(PDF,(z,limit_low[j],limit_up[j]))
         term1 = (cv1/(cv3/WL))*(sp.exp(cv3/WL*limit_up[j]) \
         - sp.exp(cv3/WL*limit_low[j]))
         term2 = (cv2/(cv4/WL))*(sp.exp(cv4/WL*limit_up[j]) \
@@ -60,23 +70,24 @@ def weighting(D,WL):
         Area_i[j] = term1 + term2
     weights = Area_i / Area
     return weights
-
-# def weighting(Depth,Wavelength):
-#     numLayers = len(Depth) - 1
-#     z = sp.symbols('z')
-#     limit_low = Depth[:-1]
-#     limit_up = Depth[1:]
-#     integralPDF = z - (2/5) * ((z/Wavelength)**(5/2)) * Wavelength
-#     layerArea = np.zeros((numLayers),dtype='object')
-#     Area = integralPDF.subs({z:Wavelength}) - integralPDF.subs({z:0})
-#     for i in range(numLayers):
-#         if limit_up[i] <= Wavelength:
-#             layerArea[i] = integralPDF.subs({z:limit_up[i]}) - integralPDF.subs({z:limit_low[i]})
-#         else:
-#             layerArea[i] = integralPDF.subs({z:Wavelength}) - integralPDF.subs({z:limit_low[i]})
-#             break
-#     weights = layerArea/Area
-#     return weights
+'''
+def weighting(Depth,Wavelength):
+    numLayers = len(Depth) - 1
+    z = sp.symbols('z')
+    limit_low = Depth[:-1]
+    limit_up = Depth[1:]
+    integralPDF = z - (2/5) * ((z/Wavelength)**(5/2)) * Wavelength
+    layerArea = np.zeros((numLayers),dtype='object')
+    Area = integralPDF.subs({z:Wavelength}) - integralPDF.subs({z:0})
+    for i in range(numLayers):
+        if limit_up[i] <= Wavelength:
+            layerArea[i] = integralPDF.subs({z:limit_up[i]}) - integralPDF.subs({z:limit_low[i]})
+        else:
+            layerArea[i] = integralPDF.subs({z:Wavelength}) - integralPDF.subs({z:limit_low[i]})
+            break
+    weights = layerArea/Area
+    return weights
+'''
 
 # Computing phase velocity by weighted average at each wavelength
 def computeWeight(DC_points,numLayers,Depth):
@@ -84,7 +95,9 @@ def computeWeight(DC_points,numLayers,Depth):
     for i in range(DC_points):
         weights = weighting(Depth,Lambda[i])
         WEIGHTS[i,:] = weights
+        plotTable(WEIGHTS,index ='Lambda {}',columns='Layer {}',Name = 'Weight matrix')
     return WEIGHTS
+
 WEIGHTS = computeWeight(DC_points,numLayers,Depth)
 
 def SVD(WEIGHT_MATRIX):
@@ -96,8 +109,18 @@ def SVD(WEIGHT_MATRIX):
     invertWeight = np.dot(V,np.dot(inv_s,UT))
     return regetWeight,invertWeight
 
+def plotTable(weightMatrix):
+    lambdaLabels = []
+    layerLabels = []
+    for i in range(len(weightMatrix[:,0])):
+        lambdaLabels.append('Lambda {}'.format(i+1))
+    for j in range(len(weightMatrix[0,:])):
+        layerLabels.append('Layer {}'.format(j+1))
+    print('\nForwad computation weight:\n', \
+    DataFrame(weightMatrix, index = lambdaLabels, columns = layerLabels))
+
 def newLayerArray(numLayerArray):
-    coeff = 0.85
+    coeff = 0.3
     newLayerSet = []
     for i in range(numLayerArray+1):
         if i == 0:
@@ -107,6 +130,20 @@ def newLayerArray(numLayerArray):
         else:
             newLayerSet.append(coeff*Lambda[i])
     return newLayerSet
+'''
+def newLayerArray(numLayerArray):
+    Alpha = 0.3
+    convertDepth = Alpha * Lambda
+    newLayerSet = []
+    for i in range(numLayerArray):
+        if i == 0:
+            newLayerSet.append(i)
+            newLayerSet.append(convertDepth[i])
+        elif i == (numLayerArray - 1): newLayerSet.append(np.inf)
+        else: newLayerSet.append(convertDepth[i])
+    return newLayerSet
+newLayerSet = newLayerArray(len(Lambda))
+'''
 
 def Forward(weightMatrix, Vs):
     Vph = []
@@ -133,7 +170,7 @@ def CheckPoint(numLayerRefine,Vph,Lambda):
     newVs = np.matmul(invertWeight,convertVs)
     return layerRefineSet,newWeightMatrix,newVs
 
-layerRefineSet,newWeightMatrix,newVs = CheckPoint(5, Vph, Lambda)
+layerRefineSet,newWeightMatrix,newVs = CheckPoint(6, Vph, Lambda)
 print('\n\nNew array of shear wave velocity is:\n',newVs)
 
 def checkDC(useLayers,useVs):
