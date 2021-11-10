@@ -70,6 +70,7 @@ def weighting(D,WL):
         Area_i[j] = term1 + term2
     weights = Area_i / Area
     return weights
+
 '''
 def weighting(Depth,Wavelength):
     numLayers = len(Depth) - 1
