@@ -1,5 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
+##
+FigFontSize = 12
+resolution = 100
+##
+Filename = 'SampleData.txt'
+LoadData = np.loadtxt(Filename, dtype='float',delimiter=None)
+##
 fs = 1000
 N=24
 x1=10
@@ -14,14 +21,11 @@ f_receiver = 4.5
 p = 95
 up_low_bounds = 'No'
 Direction = 'Forward'
-plot_dispersion_curve = 'Yes'
 dispersion_curve = 'lambda_c'
-Filename = 'SampleData.txt'
-FigFontSize = 12
-resolution = 100
-LoadData = np.loadtxt('SampleData.txt', dtype='float',delimiter=None)
+plot_dispersion_curve = 'Yes'
 ##
 class dispersion_analysis(object):
+    
     def __init__(self,fs,N,x1,dx,du,cT_min,cT_max,delta_cT,fmin,fmax,f_receiver):
         self.fs = fs
         self.N = N
@@ -30,6 +34,7 @@ class dispersion_analysis(object):
         self.cT_min,self.cT_max = cT_min,cT_max
         self.delta_cT = delta_cT
         self.fmin,self.fmax,self.f_receiver = fmin,fmax,f_receiver
+
         u_read = np.loadtxt(Filename,dtype='float', delimiter=None)
         if Direction == 'Forward':
             self.u = u_read
@@ -93,12 +98,16 @@ class dispersion_analysis(object):
         jj = np.argsort(Amax_fvec)
         self.Amax_fvec_sort = Amax_fvec[jj]
         self.Amax_cvec_sort = Amax_cvec[jj]   
-        lower_freq = 4
-        higher_freq = 43
+        lower_freq = int((input('Input lower frequency value: ')))
+        higher_freq = int((input('Input higher frequency value: ')))
         nP0 = np.arange(lower_freq,higher_freq+1,1)
         self.f_curve0 = self.Amax_fvec_sort[nP0]
         self.c_curve0 = self.Amax_cvec_sort[nP0]
-        self.lambda_curve0 = np.divide(self.c_curve0, self.f_curve0)     
+        self.lambda_curve0 = np.divide(self.c_curve0, self.f_curve0)  
+        dispersion_data = np.zeros((len(self.c_curve0),2),dtype='object')
+        dispersion_data[:,0] = self.c_curve0
+        dispersion_data[:,1] = self.lambda_curve0
+        np.savetxt('dispersion_data.txt',dispersion_data)   
         if up_low_bounds == 'yes':
             loc_p = np.argwhere(abs_norm.T > p/100)
             f_loc_p, c_loc_p = loc_p[:,1], loc_p[:,0]
@@ -184,106 +193,6 @@ class dispersion_analysis(object):
 dispersion = dispersion_analysis(fs,N,x1,dx,du,cT_min,cT_max,delta_cT,fmin,fmax,f_receiver)
 c_curve0,lambda_curve0 = dispersion.MASW_Despersion_imaging()
 
-##
-# c_test_min = 1
-# c_test_max = 500
-# delta_c_test = 0.5
-# c_test = np.arange(c_test_min,c_test_max+delta_c_test,delta_c_test)
-# n = 6
-# alpha = np.array([1400,1400,1400,1400,1400,1400,1400])
-# h = np.array([1,1,2,2,4,5,np.inf])
-# beta = np.array([75,90,150,180,240,290,290])
-# rho = [1850,1850,1850,1850,1850,1850,1850]
-##
-# def theorectical_dispersion_curve(c_test,Lambda,h,alpha,beta,rho,n):
-#     k = 2*np.pi/Lambda
-#     Det = np.zeros((len(k),len(c_test)),dtype='complex')
-#     c_t = np.zeros((len(k),1))
-#     lambda_t = np.zeros((len(k),1))
-#     for l in range(len(k)):
-#         for m in range(len(c_test)):
-#             Det[l,m] = stiffness_matrix(c_test[m],k[l],h,alpha,beta,rho,n)
-#             if m==0:
-#                 sign_old = np.sign(Det[l,m])
-#             else:
-#                 sign_old = signD
-#             signD = np.sign(Det[l,m])
-#             if sign_old*signD == -1:
-#                 c_t[l] = c_test[m]
-#                 lambda_t[l] = 2*np.pi/k[l]
-#                 break
-#     return c_t,lambda_t
-
-# def stiffness_matrix(c_test,k,h,alpha,beta,rho,n):
-#     K = np.zeros((2*(n+1),2*(n+1)))
-#     eps = 0.0001
-#     while any(abs(c_test-beta) < eps) or any(abs(c_test-alpha) < eps):
-#         c_test = c_test*(1-eps)
-#     for j in range(n):
-#         Ke = layer_stiffness_matrix(h[j],alpha[j],beta[j],rho[j],c_test,k)
-#         DOFs = np.arange(2*(j+0),2*(j+2),1)
-#         for row in DOFs:
-#             for col in DOFs:
-#                 row_idx = np.array(np.where(DOFs==row)).flatten()[0]
-#                 col_idx = np.array(np.where(DOFs==col)).flatten()[0]
-#                 K[row,col] = K[row,col] + Ke[row_idx,col_idx]
-#     Ke_halfspace = layer_stiffness_matrix_halfspace(alpha[-1],beta[-1],rho[-1],c_test,k)
-#     DOFs = np.arange(2*n,2*(n+1),1)
-#     for row in DOFs:
-#         for col in DOFs:
-#             row_idx = np.array(np.where(DOFs==row)).flatten()[0]
-#             col_idx = np.array(np.where(DOFs==col)).flatten()[0]
-#             K[row,col] = K[row,col] + Ke_halfspace[row_idx,col_idx]
-#     D = np.real(np.linalg.det(K))
-#     return D
-# def layer_stiffness_matrix(h,alpha,beta,rho,c_test,k):
-#     r = np.sqrt(1-c_test**2/alpha**2+0j)
-#     s = np.sqrt(1-c_test**2/beta**2+0j)
-#     Cr = np.cosh(k*r*h)
-#     Sr = np.sinh(k*r*h)
-#     Cs = np.cosh(k*s*h)
-#     Ss = np.sinh(k*s*h)
-#     D = 2*(1-Cr*Cs) + (1/(r*s) + r*s)*Sr*Ss
-#     k11_e = (k*rho*c_test**2)/D * (s**(-1)*Cr*Ss - r*Sr*Cs)
-#     k12_e = (k*rho*c_test**2)/D * (Cr*Cs - r*s*Sr*Ss - 1) - k*rho*beta**2*(1+s**2)
-#     k13_e = (k*rho*c_test**2)/D * (r*Sr - s**(-1)*Ss)
-#     k14_e = (k*rho*c_test**2)/D * (-Cr + Cs)
-#     k21_e = k12_e
-#     k22_e = (k*rho*c_test**2)/D * (r**(-1)*Sr*Cs - s*Cr*Ss)
-#     k23_e = -k14_e
-#     k24_e = (k*rho*c_test**2)/D * (-r**(-1)*Sr + s*Ss)
-#     k31_e = k13_e
-#     k32_e = k23_e
-#     k33_e = k11_e
-#     k34_e = -k12_e
-#     k41_e = k14_e
-#     k42_e = k24_e
-#     k43_e = -k21_e
-#     k44_e = k22_e
-#     Ke = np.array([[k11_e, k12_e, k13_e, k14_e],
-#                     [k21_e, k22_e, k23_e, k24_e],
-#                     [k31_e, k32_e, k33_e, k34_e],
-#                     [k41_e, k42_e, k43_e, k44_e]])
-#     return Ke
-
-# def layer_stiffness_matrix_halfspace(alpha,beta,rho,c_test,k):
-#     r = np.sqrt(1-c_test**2/alpha**2+0j)
-#     s = np.sqrt(1-c_test**2/beta**2+0j)
-#     k_11 = k*rho*beta**2*(r*(1-s**2))/(1-r*s)
-#     k_12 = k*rho*beta**2*(1-s**2)/(1-r*s) - 2*k*rho*beta**2
-#     k_21 = k_12
-#     k_22 = k*rho*beta**2*(s*(1-s**2))/(1-r*s)
-#     Ke_halfspace = np.array([[k_11,k_12],
-#                             [k_21, k_22]])
-#     return Ke_halfspace
-
-# c_t,lambda_t = theorectical_dispersion_curve(c_test,lambda_curve0,h,alpha,beta,rho,n)
-# fig,ax = plt.subplots(figsize=(4,6),dpi=100)
-# ax.plot(c_curve0,lambda_curve0,'-ob')
-# ax.plot(c_t,lambda_t,'-or')
-# plt.gca().invert_yaxis()
-# plt.show()
-##
 c_test_min = 1
 c_test_max = 500
 delta_c_test = 0.5
@@ -293,16 +202,21 @@ alpha = np.array([1400,1400,1400,1400,1400,1400,1400])
 h = np.array([1,1,2,2,4,5,np.inf])
 beta = np.array([75,90,150,180,240,290,290])
 rho = [1850,1850,1850,1850,1850,1850,1850]
+plot_exp_the_DC = 'Yes'
+##
 
 class seismic_backward(object):
-    def __init__(self,n,beta,h,alpha,rho,c_test):
+    def __init__(self,n,beta,h,alpha,rho,c_test,c_curve0,lambda_curve0):
         self.n = n
         self.alpha = alpha
         self.h = h
         self.beta = beta
         self.rho = rho
         self.c_test = c_test
-        self.wavenumber = (2*np.pi)/(lambda_curve0)
+        self.c_exp = c_curve0
+        self.lambda_exp = lambda_curve0
+        self.wavenumber = (2*np.pi)/(self.lambda_exp)
+        a = dispersion_analysis()
 
     def layer_stiffness_matrix(self,h,alpha,beta,rho,c_test,k):
         r = np.sqrt(1-c_test**2/alpha**2+0j)
@@ -377,8 +291,8 @@ class seismic_backward(object):
         n = self.n
         k = self.wavenumber
         Det = np.zeros((len(k),len(c_test)))
-        c_t = np.zeros((len(k),1))
-        lambda_t = np.zeros((len(k),1))
+        self.c_t = np.zeros((len(k),1))
+        self.lambda_t = np.zeros((len(k),1))
         for l in range(len(k)):
             for m in range(len(c_test)):
                 Det[l,m] = self.stiffness_matrix(c_test[m],k[l],h,alpha,beta,rho,n)
@@ -388,18 +302,31 @@ class seismic_backward(object):
                     sign_old = signD
                 signD = np.sign(Det[l,m])
                 if sign_old*signD == -1:
-                    c_t[l] = c_test[m]
-                    lambda_t[l] = 2*np.pi*(1/k[l])
+                    self.c_t[l] = c_test[m]
+                    self.lambda_t[l] = 2*np.pi*(1/k[l])
                     break
-        return c_t,lambda_t
+        if plot_exp_the_DC == 'Yes':
+            fig,ax = plt.subplots(figsize=(4,6),dpi=100)
+            ax.plot(self.c_exp,self.lambda_exp,'-ob')
+            ax.plot(self.c_t,self.lambda_t,'-or')
+            ax.set_xlabel('Reyleigh wave velocity [m/s]',fontsize = FigFontSize)
+            ax.set_ylabel('Wavelength [m]', fontsize = FigFontSize)
+            ax.legend(['Experimentral DC','Theorectical DC'],loc='best')
+            plt.gca().invert_yaxis()
+            plt.show()
+        return self.c_t,self.lambda_t
 
-backward_calculation = seismic_backward(n,beta,h,alpha,rho,c_test)
+    def mistfit(self):
+        N = len(self.c_t)
+        Norm_diff = []
+        for i in range(N):
+            Norm_diff.append(np.abs(self.c_exp[i]-self.c_t[i])/self.c_exp[i])
+        MSE = (1/N)*np.sum(Norm_diff)
+        misfitVal = 'Misfit is: {0:.5f}%'.format(MSE)
+        return misfitVal
+        
+backward_calculation = seismic_backward(n,beta,h,alpha,rho,c_test,c_curve0,lambda_curve0)
 c_t,lambda_t = backward_calculation.theorectical_dispersion_curve()
-print(c_t)
-fig,ax = plt.subplots(figsize=(4,6),dpi=100)
-ax.plot(c_curve0,lambda_curve0,'-ob')
-ax.plot(c_t,lambda_t,'-or')
-plt.gca().invert_yaxis()
-plt.show()
-##
+error = backward_calculation.mistfit()
+print(error)
 
