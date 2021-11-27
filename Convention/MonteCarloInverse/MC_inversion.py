@@ -1,11 +1,8 @@
+#%% Library used
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-##
-FigFontSize = 11
-resolution = 100
-##
 Filename = 'SampleData_MASWavesInversion.csv'
 # sample_data = pd.read_csv(Filename,encoding="utf-8")
 sample_data = np.genfromtxt(Filename,delimiter=',',dtype=None)
@@ -22,7 +19,8 @@ h_initial = [2,2,4,6]
 beta_initial = [1.09*c_OBS[0], 1.09*c_OBS[9], 1.09*c_OBS[16], 1.09*c_OBS[22], 1.09*c_OBS[-1]]
 n_unsat = 1
 nu_unsat = 0.3
-alpha_temp = [np.sqrt(2*(1-nu_unsat)/(1-2*nu_unsat)) * beta_initial[i] for i in range(len(beta_initial))]
+alpha_temp = [np.sqrt(2*(1-nu_unsat)/(1-2*nu_unsat)) * beta_initial[i] 
+                                    for i in range(len(beta_initial))]
 alpha_initial = [alpha_temp[0], 1440, 1440, 1440, 1440]
 rho = [1850, 1900, 1950, 1950, 1950]
 
@@ -30,8 +28,10 @@ N_reversals = 0 # Normally dispersive analysis
 # Search control parameters
 b_S = 5
 b_h = 10
-N_max = 100
-e_max = 1/100
+N_max = 300
+e_max = 0.4/100
+
+#%% -----------------------MONTE-CARLO SIMULATION------------------------------------
 
 def Fast_delta_recersion(c,k,alpha,beta1,beta2,rho1,rho2,h,X):
     gamma1 = beta1**2/c**2
@@ -133,20 +133,23 @@ def Monte_Carlo_Analysis(c_min,c_max,c_step,delta_c,n,n_unsat,alpha_initial,nu_u
     h_opt = h_initial
     e_opt = e_initial
     Nend = N_max
-    x_data = []
-    y_data = []
+    iter = []
+    misfit = []
+    all_iter = []
+    all_misfit = []
+
+    plt.ion()
+    plt.figure(figsize=(10,6))
     for w in range(N_max):
-        
         low_rand = [-(b_S/100)*beta_opt[i] for i in range(len(beta_initial))]
         up_rand = [b_S/100*beta_opt[i] for i in range(len(beta_initial))]
         
         beta_test = beta_opt + np.random.uniform(low_rand,up_rand)
-
-        # print((beta_test[N_reversals+1:-1] <= beta_test[N_reversals+2:]).all())
         while ((beta_test[N_reversals+1:-1] <= beta_test[N_reversals+2:]).all()) == False:
             beta_test = beta_test = beta_opt + np.random.uniform(low_rand,up_rand)
         
-        alpha_unsat = [np.sqrt((2*(1-nu_unsat)) / (1-2*nu_unsat)) * beta_test[i] for i in range(len(beta_test))]
+        alpha_unsat = [np.sqrt((2*(1-nu_unsat)) / (1-2*nu_unsat)) * beta_test[i] 
+                                                    for i in range(len(beta_test))]
         alpha_test = 1440 * np.ones((len(beta_test)))     
 
         if n_unsat != 0:
@@ -156,7 +159,8 @@ def Monte_Carlo_Analysis(c_min,c_max,c_step,delta_c,n,n_unsat,alpha_initial,nu_u
         up_rand_h = [b_S/100*h_opt[i] for i in range(len(h_initial))]
 
         h_test = h_opt + np.random.uniform(low_rand_h,up_rand_h)
-        c_t,lambda_t = Theorectical_dispersion_curve(c_min,c_max,c_step,lambda_OBS,n,alpha_test,beta_test,rho,h_test,delta_c)
+        c_t,lambda_t = Theorectical_dispersion_curve(\
+                    c_min,c_max,c_step,lambda_OBS,n,alpha_test,beta_test,rho,h_test,delta_c)
         e_test = Misfit(c_t,c_OBS)
 
         store_all[0,w] = np.zeros((len(beta_test)))
@@ -171,81 +175,146 @@ def Monte_Carlo_Analysis(c_min,c_max,c_step,delta_c,n,n_unsat,alpha_initial,nu_u
         store_all[2,w] = alpha_test
         store_all[3,w] = c_t
         store_all[4,w] = lambda_t
-        store_all[5,w] = e_test 
+        store_all[5,w] = e_test
         
+        all_iter.append(w)
+        all_misfit.append(e_test*100)
+        plt.plot(all_iter,all_misfit,'-o')
+        plt.xlabel('Number of iteration',fontsize=12)
+        plt.ylabel('Misfit (%)',fontsize=12)
+
+        if e_test > e_opt:
+            print('Iteration # {} -- NOT ACCEPTED'.format(w))
         if e_test <= e_opt:
-            e_opt = e_test
+            e_opt = e_test[:]
             print('Iteration # {} --- Misfit value {}%'.format(w,e_opt*100))            
             beta_opt = beta_test
             h_opt = h_test
-            x_data.append(w)
-            y_data.append(e_opt)
-
+            iter.append(w)
+            misfit.append(e_opt*100)
+            plt.plot(iter,misfit,'-o')
+            plt.xlabel('Number of iteration',fontsize=12)
+            plt.ylabel('Misfit (%)',fontsize=12)
+            plt.draw()
+            plt.pause(0.1)
+            
         if e_opt < e_max:
             Nend = w
             break
+    plt.show()
+    # plt.show(block=True) # to hold after finished
+    
+    return store_all
 
-    if (up_low_boundary == 'Yes'):
-        Vec = np.zeros((Nend,1))
-        count = 0
-        for i in range(Nend):
-            temp = np.zeros((len(c_OBS_low),1))
-            for j in range(len(c_OBS_low)):
-                temp[j] = (c_OBS_low[j] < store_all[3,i][j] < c_OBS_up[j])
-                if temp[j] == True: 
-                    temp[j] = 1
-                else:
-                    temp[j] = 0
-            if sum(temp) == len(c_OBS_low):
-                Vec[i] = 1
-                count += 1
-        store_accepted = np.zeros((6,count))
-        j = 0
-        for i in range(Nend):
-            if Vec[i] == 1:
-                j += 1
-                store_accepted[0,j] = np.zeros((len(beta_test)))
-                store_accepted[1,j] = np.zeros((len(h_test)))
-                store_accepted[2,j] = np.zeros((len(alpha_test)))
-                store_accepted[3,j] = np.zeros((len(c_t)))
-                store_accepted[4,j] = np.zeros((len(lambda_t)))
-                store_accepted[5,j] = np.zeros((len(e_test)))
-                store_accepted[0,j] = store_all[0,j]
-                store_accepted[1,j] = store_all[1,j]
-                store_accepted[2,j] = store_all[2,j]
-                store_accepted[3,j] = store_all[3,j]
-                store_accepted[4,j] = store_all[4,j]
-                store_accepted[5,j] = store_all[5,j]
-    else:
-        store_accepted = np.NaN
-    return store_all,store_accepted
+store_all = Monte_Carlo_Analysis(\
+                c_min,c_max,c_step,delta_c,n,n_unsat,alpha_initial,nu_unsat,
+                beta_initial,rho,h_initial,N_reversals,c_OBS,lambda_OBS,
+                up_low_boundary,c_OBS_up,c_OBS_low,b_S,b_h,N_max,e_max)
 
-store_all,store_accepted = Monte_Carlo_Analysis(c_min,c_max,c_step,delta_c,n,n_unsat,alpha_initial,nu_unsat,beta_initial,
-                rho,h_initial,N_reversals,c_OBS,lambda_OBS,up_low_boundary,c_OBS_up,c_OBS_low,
-                b_S,b_h,N_max,e_max)
-
-MaxDepth = 16
-
-def visualization(c_OBS,lambda_OBS,up_low_boundary,c_OBS_up,c_OBS_low,n,store_all,store_accepted,MaxDepth):
+#%% -----------------------PLOTTING DISPERSION CURVE------------------------------------
+def visualization(c_OBS,lambda_OBS,n,store_all):
+    MaxDepth = 16.0
     NoPlot_all = len(store_all[0,:])
     store_e_all = np.zeros((NoPlot_all))
-
     for i in range(NoPlot_all):
         store_e_all[i] = store_all[5,i]
-
     sort_e_all_plot = np.sort(store_e_all)
     order_all_plot = np.argsort(store_e_all)
     sort_e_all_plot = sort_e_all_plot[::-1]
     order_all_plot = order_all_plot[::-1]
-    fig,ax = plt.subplots(figsize=(4,6))
-    plt.xlim(100,200)
+
+    fig,ax = plt.subplots(1,2,figsize=(10,8))
+    ax[0].set_xlim(100,200)
+
     for j in range(NoPlot_all):
         c_plot = store_all[3,order_all_plot[j]]
         lambda_plot = store_all[4,order_all_plot[j]]
-        ax.plot(c_plot,lambda_plot,linewidth = j/N_max)
-    ax.set_xlabel('Phase velocity (m/s)')
-    ax.set_ylabel('Wavelength (m)')
-    plt.gca().invert_yaxis()
-    plt.show()
+        ax[0].plot(c_plot,lambda_plot,linewidth = j/N_max)
+    ax[0].plot(c_OBS,lambda_OBS,'-ok',linewidth=2,label = 'OBS D-curve')
+    ax[0].legend()
+    plt.rc('xtick', labelsize=11) 
+    plt.rc('ytick', labelsize=11)
+    ax[0].legend(fontsize = 12)
+    ax[0].set_xlabel('Phase velocity (m/s)',fontsize=12)
+    ax[0].set_ylabel('Wavelength (m)',fontsize=12)
+    ax[0].invert_yaxis()
 
-visualization(c_OBS,lambda_OBS,up_low_boundary,c_OBS_up,c_OBS_low,n,store_all,store_accepted,MaxDepth)
+    for j in range(NoPlot_all):
+        h_plot = store_all[1,order_all_plot[j]]
+        h_plot = np.append(0,h_plot)
+        h_plot = np.append(h_plot,np.max(MaxDepth-np.sum(store_all[1,order_all_plot[j]]),0))
+        beta_plot = store_all[0,order_all_plot[j]]
+        plot_layer_depth = np.zeros((2*(n+1)))
+        plot_beta = np.zeros((2*(n+1)))
+
+        for i in range(n+1):
+            plot_layer_depth[2*i] = np.sum(h_plot[:i+1])
+            plot_layer_depth[2*i+1] = np.sum(h_plot[:i+2])
+            plot_beta[2*i] = beta_plot[i]
+            plot_beta[2*i+1] = beta_plot[i]
+
+        ax[1].set_xlim(100,220)
+        ax[1].plot(plot_beta,plot_layer_depth,linewidth = j/N_max)
+    ax[1].plot(plot_beta,plot_layer_depth,'-ok',linewidth=2,label='Best fit profile')
+    ax[1].legend()
+    plt.rc('xtick', labelsize=11) 
+    plt.rc('ytick', labelsize=11)
+    ax[1].legend(fontsize = 12)
+    ax[1].set_xlabel('Phase velocity (m/s)',fontsize=12)
+    ax[1].set_ylabel('Wavelength (m)',fontsize=12)
+    ax[1].invert_yaxis()
+    plt.show()
+    # if up_low_boundary == 'Yes':
+    #     print(store_accepted)
+    #     NoPlot = len(store_accepted[0,:])
+    #     store_e = np.zeros((NoPlot))
+    #     for i in range(NoPlot):
+    #         store_e[i] = store_accepted[5,i]
+    #     sort_e_plot = np.sort(store_e)
+    #     order_plot = np.argsort(store_e)
+    #     sort_e_plot = sort_e_plot[::-1]
+    #     order_plot = order_plot[::-1]
+
+visualization(c_OBS,lambda_OBS,n,store_all)
+
+# %%
+#  -----------------------PLOTTING EXTRACTED DISPERSION CURVE------------------------------------
+# def in_bound(up_low_boundary,c_OBS_up,c_OBS_low,N_max):
+#     Nend = N_max
+#     if (up_low_boundary == 'Yes'):
+#             Vec = np.zeros((Nend))
+#             count = 0
+#             for i in range(Nend):
+#                 temp = np.zeros((len(c_OBS_low),1))
+#                 for j in range(len(c_OBS_low)):
+#                     temp[j] = (c_OBS_low[j] < store_all[3,i][j] < c_OBS_up[j])
+#                     if temp[j] == True: 
+#                         temp[j] = 1
+#                     else:
+#                         temp[j] = 0
+#                 print(sum(temp) == len(c_OBS_low))
+#                 if sum(temp) == len(c_OBS_low):
+
+#                     Vec[i] = 1
+#                     count += 1
+#             store_accepted = np.zeros((6,count),dtype='object')
+#             j = 0
+#             for i in range(Nend):
+#                 if Vec[i] == 1:
+#                     j += 1
+#                     store_accepted[0,j] = np.zeros((len(store_all[0,0])))
+#                     store_accepted[1,j] = np.zeros((len(store_all[1,0])))
+#                     store_accepted[2,j] = np.zeros((len(store_all[2,0])))
+#                     store_accepted[3,j] = np.zeros((len(store_all[3,0])))
+#                     store_accepted[4,j] = np.zeros((len(store_all[4,0])))
+#                     store_accepted[5,j] = np.zeros((len(store_all[5,0])))
+#                     store_accepted[0,j] = store_all[0,j]
+#                     store_accepted[1,j] = store_all[1,j]
+#                     store_accepted[2,j] = store_all[2,j]
+#                     store_accepted[3,j] = store_all[3,j]
+#                     store_accepted[4,j] = store_all[4,j]
+#                     store_accepted[5,j] = store_all[5,j]
+#     else:
+#         store_accepted = np.NaN
+#     return store_accepted
+# store_accepted = in_bound(up_low_boundary,c_OBS_up,c_OBS_low,N_max)
