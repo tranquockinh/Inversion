@@ -7,17 +7,17 @@ from pandas import *
 #%%
 shearWave = [150,300,400]
 thickness = [5,10,np.inf]
-lambda_min,lambda_max, delta_lambda = 3,44,6
+lambda_min,lambda_max, delta_lambda = 2,44,2
 wl = np.arange(lambda_min,lambda_max+delta_lambda,delta_lambda)
 displ_function = input('input 1 for Cao,2011; 2 if Leong,2012 version: ')
 #%%
 class forward():
-    def __init__(self,shearWave,thickness):
+    def __init__(self,wl,shearWave,thickness):
         self.t = thickness
         self.t = np.append(0,self.t)
         self.Swave = shearWave
         self.nLayer = len(self.t)-1
-
+        self.Lambda = wl
     def boundaries(self):
         z = sp.Symbol('z')
         low = self.t[:-1]
@@ -55,8 +55,8 @@ class forward():
         return weights
 
     def weightMatrix(self):
-        W = np.zeros((len(wl),self.nLayer))
-        for i,lambdaValue in enumerate(wl):
+        W = np.zeros((len(self.Lambda),self.nLayer))
+        for i,lambdaValue in enumerate(self.Lambda):
             if displ_function == 1:
                 weights = self.pdf1(lambdaValue)
             else:
@@ -70,7 +70,6 @@ class forward():
         W,_ = self.weightMatrix()
         Swave = np.dot(W,self.Swave)
         Rwave = 0.93*Swave
-        Swave = np.dot(W,self.Swave)
         return Swave,Rwave
 
     def refineLayer(self,numLayer,coeff):
@@ -82,16 +81,27 @@ class forward():
                 layers.append(wl[:numLayer][i]*coeff)
         return layers
 
-fw = forward(shearWave,thickness)
-coeff = 0.3
-test_nLayer = len(wl)
-test_thickness = fw.refineLayer(test_nLayer,coeff)[1:]
+fw = forward(wl,shearWave,thickness)
+coeff = 1
+fullSwave,fullRwave = fw.DC()
+fullThickness = fw.refineLayer(len(wl),coeff)[1:]
+test_nLayer = 5
+
+wl_test = wl[:test_nLayer]
+Swave_test = fullSwave[:test_nLayer]
+thick_test = fullThickness[:test_nLayer]
+thick_test[-1] = np.inf
+
+fw = forward(wl_test,Swave_test,thick_test)
+
 test_Swave,test_Rwave = fw.DC()
+print(test_Rwave)
+test_thickness = fw.refineLayer(test_nLayer,coeff)[1:]
 W,invertW = fw.weightMatrix()
 #%%
 class backward():
     def __init__(self):
-        self.DC = forward(test_Swave[:test_nLayer],test_thickness)
+        self.DC = forward(wl[:test_nLayer],test_Swave,test_thickness)
     
     def inversionData(self):
         W,invertW = self.DC.weightMatrix()
@@ -99,12 +109,50 @@ class backward():
         return W,invertW,Swave,Rwave
 
     def inversion(self):
-        _,invertW,Swave,Rwave = self.inversionData()
-        iSwave = np.matmul(invertW,Swave)
-        return iSwave
+        _,invertW,Swave,_ = self.inversionData()
+        self.iSwave = np.matmul(invertW,Swave)
+        return self.iSwave
+    
+    def check_forward(self):
+        checkFD = forward(wl[:test_nLayer],self.iSwave,test_thickness)
+        # check_W,_ = checkFD.weightMatrix()
+        # checkRwave = 0.93 * np.matmul(check_W,self.iSwave)
+        _,checkRwave = checkFD.DC()
+        return checkRwave
 
 bw = backward()
 W,invertW,Swave,Rwave = bw.inversionData()
 iSwave = bw.inversion()
-print(iSwave)
-    
+checkRwave = bw.check_forward()
+print(checkRwave)
+# def plot(iniSwave,iniThickness,invSwave,invThickness,test_Rwave,test_thickness):
+#     iniThickness[-1] = iniThickness[-2] + 0.5*iniThickness[-2]
+#     invThickness[-1] = iniThickness[-1]
+#     iniThickness = np.append(0,iniThickness)
+#     invThickness = np.append(0,invThickness)
+#     iniSwave = np.append(iniSwave,iniSwave[-1])
+#     invSwave = np.append(invSwave,invSwave[-1])
+
+#     fig,ax = plt.subplots(1,2,figsize=(10,6))
+#     ax[0].step(iniSwave,iniThickness,'-r',linewidth=2,label='True')
+#     ax[0].step(invSwave,invThickness,'--b',label='Inverted')
+#     ax[0].invert_yaxis()
+#     ax[0].set_xlabel('Shear velocity, Vph [m/s]')
+#     ax[0].set_ylabel('Depth, [m]')
+#     ax[0].xaxis.set_label_position('top')
+#     ax[0].xaxis.tick_top()
+#     ax[0].spines['bottom'].set_color('white')
+#     ax[0].spines['right'].set_color('white')
+#     ax[0].legend()
+#     ax[1].plot(test_Rwave,test_thickness,'-or',linewidth=2,markerfacecolor='None')
+#     ax[1].invert_yaxis()
+#     ax[1].set_xlabel('Phase velocity, Vph [m/s]')
+#     ax[1].set_ylabel('Wavelength, [m]')
+#     ax[1].xaxis.set_label_position('top')
+#     ax[1].xaxis.tick_top()
+#     ax[1].spines['bottom'].set_color('white')
+#     ax[1].spines['right'].set_color('white')
+#     # plt.show()
+
+# plot(shearWave,thickness,iSwave,test_thickness,fullRwave,fullThickness)
+
