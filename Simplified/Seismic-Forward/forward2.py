@@ -109,7 +109,6 @@ class backward_engine(forward_engine):
         return S_wave_inverted
 
     def echelon(self):
-
         Ab = np.concatenate((self.weight_for_inversion,self.shearwave_for_inversion[:,np.newaxis]),axis=1)
         Matrix_Ab = sp.Matrix(Ab)
         rref_Matrix_Ab = Matrix_Ab.rref()
@@ -141,28 +140,21 @@ print()
 backward_model = backward_engine(n_inverted_layer)
 
 #############################################################
-
 # inversion results
 S_wave_inversion = backward_model.inverted_shearwave_velocity()
 print()
-print(S_wave_inversion)
+# print(S_wave_inversion)
 
 #############################################################
-
-
 # see what insides
-# U,S,VT,invert_W = backward_model.analysis_SVD()
-
 # Lood the row reduced ECHELON form (reff)
-# backward_model.echelon()
+backward_model.echelon()
 
 #############################################################
-
 # Consider all layers
 # backward_model.second_chance()
 
 #############################################################
-
 # check dispersion curve
 check_S_wave_velo_forward,check_R_wave_velo_forward = backward_model.check_dispersion_curve()
 print()
