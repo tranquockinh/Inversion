@@ -42,7 +42,6 @@ class forward_engine(object):
         return weightMatrix
     
     def sigular_value_de(self,weightMatrix):
-        # weightMatrix = self.weight_allLambda()
         U,S,VT = np.linalg.svd(weightMatrix,full_matrices=False)
         invert_W = np.dot(VT.T,np.dot(np.linalg.inv(np.diag(S)),U.T))
         return U,S,VT,invert_W
@@ -80,8 +79,6 @@ class backward_engine(forward_engine):
         depth_for_inversion = np.append(0,temp)
         depth_for_inversion[-1] = np.inf
         # 3.shear wave
-        
-        Rwave_for_check = self.R_wave_velo_forward[:self.number_invert_layers]
         return depth_for_inversion
 
     def weight_allLambda_inversion(self):
@@ -89,21 +86,27 @@ class backward_engine(forward_engine):
         depth_for_inversion = self.inversion_data()
         # Compute the weight matrix with inversion input
         self.forward_modeling = forward_engine(depth_for_inversion, self.shearwave_for_inversion, self.full_wavelegnth)
-        weight_matrix_full = self.forward_modeling.weight_allLambda()
-        self.weight_for_inversion = weight_matrix_full[:self.number_invert_layers,:self.number_invert_layers]
+        self.weight_matrix_full = self.forward_modeling.weight_allLambda()
+        self.weight_for_inversion = self.weight_matrix_full[:self.number_invert_layers,:self.number_invert_layers]
         # visualize the weight matrix in table
         weight_for_inversion_table = self.forward_modeling.weightTable()
-
-    def inversion(self):
-        self.weight_allLambda_inversion()
-        S_wave_inversion = np.matmul(np.linalg.inv(self.weight_for_inversion),self.shearwave_for_inversion)
-        return S_wave_inversion
     
     # Eigen-values analysis
-    def analysis_SVD(self):
-        # weight_for_inversion = self.weight_allLambda_inversion()
-        U,S,VT,invert_W = self.forward_modeling.sigular_value_de(self.weight_for_inversion)
+    def analysis_SVD(self, input_matrix):
+        U,S,VT,invert_W = self.forward_modeling.sigular_value_de(input_matrix)
         return U,np.diag(S),VT,invert_W
+
+    def inversion(self, weight_matrix, shear_wave_velocity):
+        U, diagS, VT, invert_W = self.analysis_SVD(weight_matrix)
+        # S_wave_inversion = np.matmul(np.linalg.inv(self.weight_for_inversion),self.shearwave_for_inversion)
+        S_wave_inversion = np.matmul(invert_W, shear_wave_velocity)
+        return S_wave_inversion
+
+    def inverted_shearwave_velocity(self):
+        self.weight_allLambda_inversion()
+        S_wave_inverted = self.inversion(self.weight_for_inversion,self.shearwave_for_inversion)
+        # print(S_wave_inverted)
+        return S_wave_inverted
 
     def echelon(self):
 
@@ -115,28 +118,53 @@ class backward_engine(forward_engine):
         
     def check_dispersion_curve(self):
         depth_for_inversion = self.inversion_data()
-        S_wave_inversion = self.inversion()
+        S_wave_inversion = self.inverted_shearwave_velocity()
         check_forward_engine = forward_engine(depth_for_inversion, S_wave_inversion, self.full_wavelegnth)
         # check_weight_matrix = check_forward_engine.weight_allLambda()
         check_S_wave_velo_forward,check_R_wave_velo_forward = check_forward_engine.dispersion_curve()
         return check_S_wave_velo_forward,check_R_wave_velo_forward
 
+    def second_chance(self):
+        shear_waves = [] 
+        shear_waves.extend(self.shearwave_for_inversion)
+        while len(shear_waves) < len(self.full_wavelegnth):
+            shear_waves = np.append(shear_waves,shear_waves[-1])
+
+        _, _, _, invert_W = self.analysis_SVD(self.weight_matrix_full)
+        return print(np.matmul(invert_W, shear_waves))
+
+
 forward_model = forward_engine(depth,Swave,wavelen)
 S_wave_velo_forward,R_wave_velo_forward = forward_model.dispersion_curve()
 print(R_wave_velo_forward)
+print()
+backward_model = backward_engine(n_inverted_layer)
 
-backward_model = backward_engine(3)
+#############################################################
+
 # inversion results
-S_wave_inversion = backward_model.inversion()
+S_wave_inversion = backward_model.inverted_shearwave_velocity()
+print()
 print(S_wave_inversion)
 
+#############################################################
+
+
 # see what insides
-U,S,VT,invert_W = backward_model.analysis_SVD()
+# U,S,VT,invert_W = backward_model.analysis_SVD()
 
 # Lood the row reduced ECHELON form (reff)
 # backward_model.echelon()
 
+#############################################################
+
+# Consider all layers
+# backward_model.second_chance()
+
+#############################################################
+
 # check dispersion curve
 check_S_wave_velo_forward,check_R_wave_velo_forward = backward_model.check_dispersion_curve()
+print()
 print(check_R_wave_velo_forward)
 
