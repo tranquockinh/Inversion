@@ -7,7 +7,7 @@ from pandas import *
 #%%
 shearWave = [150,300,400]
 thickness = [5,10,np.inf]
-lambda_min,lambda_max, delta_lambda = 2,40,4
+lambda_min,lambda_max, delta_lambda = 6,40,6
 wl = np.arange(lambda_min,lambda_max+delta_lambda,delta_lambda)
 displ_function = input('input 1 for Cao,2011; 2 if Leong,2012 version: ')
 #%%
@@ -81,51 +81,60 @@ class forward():
                 layers.append(wl[:numLayer][i]*coeff)
         return layers
 
-fw = forward(wl,shearWave,thickness)
-coeff = 1/2
-fullSwave,fullRwave = fw.DC()
-fullThickness = fw.refineLayer(len(wl),coeff)[1:]
-
-test_nLayer = len(wl)
-
-wl_test = wl[:test_nLayer]
-Swave_test = fullSwave[:test_nLayer]
-thick_test = fullThickness[:test_nLayer]
-thick_test[-1] = np.inf
-print(Swave_test)
-fw = forward(wl_test,Swave_test,thick_test)
-W,invertW = fw.weightMatrix()
-
 #%%
 class backward():
-    def __init__(self):
-        self.DC = forward(wl_test,Swave_test,thick_test)
-    
-    def inversionData(self):
-        W,invertW = self.DC.weightMatrix()
-        Swave,Rwave = self.DC.DC()
-        return W,invertW,Swave,Rwave
+    def __init__(self,wl,shearWave,thickness,coeff,test_nLayer):
+        self.fw = forward(wl,shearWave,thickness)
+        self.test_nLayer = test_nLayer
+        fullSwave,fullRwave = self.fw.DC()
+        fullThickness = self.fw.refineLayer(len(wl),coeff)[1:]
+        self.coeff = coeff
+        self.wl_test = wl[:test_nLayer]
+        self.Swave_test = fullSwave[:test_nLayer]
+        self.Rwave_test = fullRwave[:test_nLayer]
+        self.thick_test = fullThickness[:test_nLayer]
+        self.thick_test[-1] = np.inf
+
+    def initialization(self):
+        ini_weight = np.zeros((self.test_nLayer,self.test_nLayer))
+        for i in range(self.test_nLayer):
+            thickness = self.fw.refineLayer(i+1,self.coeff)[1:]
+            ini_fw = forward(wl[:i+1],shearWave,thickness)
+            W,invertW = ini_fw.weightMatrix()
+            ini_weight[:i+1,:i+1] = W[::1,::1]
+        self.init_Vs = np.matmul(ini_weight,self.Swave_test)
+        return self.init_Vs,thickness
 
     def inversion(self):
-        # _,invertW,Swave_test,_ = self.inversionData()
-        self.iSwave = np.matmul(invertW,Swave_test)
+        fw2 = forward(self.wl_test,self.init_Vs,self.thick_test)
+        W,invertW = fw2.weightMatrix()
+        self.iSwave = np.matmul(invertW,self.Swave_test)
         return self.iSwave
 
     def check_forward(self):
-        checkFD = forward(wl,self.iSwave,thick_test)
+        checkFD = forward(wl,self.iSwave,self.thick_test)
         checkSwave,checkRwave = checkFD.DC()
         return checkSwave,checkRwave
+    
+    def parameters(self):
+        test_Rwave = self.Rwave_test
+        return test_Rwave
 
-bw = backward()
-W,invertW,Swave,Rwave = bw.inversionData()
-iSwave = bw.inversion()
-print(iSwave[:,np.newaxis])
+bw = backward(wl,shearWave,thickness,1/3,len(wl))
+
+#%% ploting data
+_,invthickness = bw.initialization()
+inverted_Vs = bw.inversion()
 checkSwave,checkRwave = bw.check_forward()
-# print(checkSwave[:,np.newaxis])
-
+test_Rwave = bw.parameters()
+iniSwave = shearWave
+iniThickness = thickness
+invSwave = inverted_Vs
 
 
 def plot(iniSwave,iniThickness,invSwave,invThickness,test_Rwave,checkRwave,wl):
+    
+    
     iniThickness[-1] = iniThickness[-2] + 0.5*iniThickness[-2]
     invThickness[-1] = iniThickness[-1]
     iniThickness = np.append(0,iniThickness)
@@ -157,4 +166,4 @@ def plot(iniSwave,iniThickness,invSwave,invThickness,test_Rwave,checkRwave,wl):
     ax[1].legend()
     plt.show()
 
-plot(shearWave,thickness,iSwave,thick_test,fullRwave,checkRwave,wl)
+plot(iniSwave,iniThickness,invSwave,invthickness,test_Rwave,checkRwave,wl)

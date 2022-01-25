@@ -124,6 +124,8 @@ class backward(object):
         new_dispersion = forward(input_thickness,input_lamda_Vec,name_displ_function)
         check_dispersion =  new_dispersion.dispersionCurve(invert_sWave)
 
+        
+
         return invert_sWave,check_dispersion
 
 #     # def inversion(self):
@@ -139,7 +141,7 @@ test = backward(check_nLayer,wavelength_depth_rat)
 input_rWave,input_thickness,input_lamda_Vec = test.inversionData()
 
 convert_Swave,check_dispersion = test.new_weight_matrix_checkpoints()
-print(check_dispersion)
+# print(check_dispersion)
 #%%
 def plot(Lambda,Vph,check_dispersion):
     fig,ax = plt.subplots(figsize=(4,5),dpi=100)

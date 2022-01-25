@@ -1,7 +1,8 @@
+#%%
 import numpy as np
 import matplotlib.pyplot as plt
 ##
-FigFontSize = 11
+FigFontSize = 14
 ##
 
 c_test_min = 0
@@ -16,10 +17,27 @@ beta = np.array([75,90,150,180,240,290,290])
 # beta = np.array([100,120,150,150,240,280,280])
 rho = [1850,1850,1850,1850,1850,1850,1850]
 plot_exp_the_DC = 'Yes'
-##
 dispersionData = np.loadtxt('dispersion_data.txt', dtype='float', delimiter=None)
 c_curve0,lambda_curve0 = dispersionData[:,0],dispersionData[:,1]
-##
+h_plot = np.zeros((len(h)))
+for i in range(len(h)):
+    if i == 0:
+        h_plot[i] = h[i]
+    else:
+        h_plot[i] = h_plot[i-1] + h[i]
+h_plot[-1] = h_plot[-2] + 4
+h_plot[-1] += 4
+beta_plot = beta
+
+beta_plot = np.append(beta_plot[0],beta_plot)
+h_plot = np.append(0,h_plot)
+
+plt.figure(figsize=(4,6))
+plt.step(beta_plot,h_plot)
+plt.xlabel('Shear wave velocity [m/s]',fontsize = FigFontSize)
+plt.ylabel('Depth [m]', fontsize = FigFontSize)
+plt.gca().invert_yaxis()
+#%%
 class seismic_backward(object):
     def __init__(self,n,beta,h,alpha,rho,c_test,c_curve0,lambda_curve0):
         self.n = n

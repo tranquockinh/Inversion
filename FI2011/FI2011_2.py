@@ -18,7 +18,7 @@ beta = (0.87+1.12*PR)/(1+PR)
 Layer_Data = np.array([[150,5],
                        [400,np.inf]])
 waveLength0 = 6
-deltaWaveLength = 9
+deltaWaveLength = 6
 Lambda = np.arange(waveLength0,45,deltaWaveLength)
 
 def dataInput(soilProfile, desiredWavelength):
@@ -175,7 +175,7 @@ def plot():
     ax[0].xaxis.tick_top()
     ax[0].spines['bottom'].set_color('white')
     ax[0].spines['right'].set_color('white')
-    ax[1].plot(Vph,Lambda,'-bo',markerfacecolor='None')
+    ax[1].plot(Vph,Lambda,'-bo',markerfacecolor='None',label='DC')
     numLayers,Depth,Vs,DC_points = dataInput(initialDataProfile,Lambda)
     newWeightMatrix = computeWeight(DC_points,numLayers,Depth)
     newPhase = Forward(newWeightMatrix,initialDataProfile[:,0])
@@ -190,5 +190,18 @@ def plot():
     # ax.set_xlim(0,Vs[-1])
     # ax.spines['bottom'].set_color('white')
     # ax.spines['right'].set_color('white')
+    ax2 = ax[1].twinx()
+    Vs = np.append(Vs,Vs[-1])
+    Depth[-1] = Depth[-2] + 2
+    Depth = np.append(0,Depth)
+    ax2.step(Vs,Depth[1:],'r',label='Initialized Vs-profile')
+    ax2.invert_yaxis()
+    ax2.set_xlabel('Shear velocity, Vph [m/s]')
+    ax2.set_ylabel('Depth, [m]',color='tab:red')
+    ax2.tick_params(axis='y', labelcolor='tab:red')
+    ax2.xaxis.set_label_position('top')
+    ax2.xaxis.tick_top()
+    ax[1].legend(loc='upper right')
+    ax2.legend(loc='lower left')
     plt.show()
 plot()

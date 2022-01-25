@@ -10,8 +10,10 @@ from pandas import *
 shearWave = [150,200,250,400]
 thickness = [2,5,10,np.inf]
 lambda_min,lambda_max, delta_lambda = 6,40,2
+total_refine_layers = len(np.arange(lambda_min,lambda_max+delta_lambda,delta_lambda))
 name_displ_function = input('inpu 1 if use (Cao,2011) version and input 2 if use (Leong, 2012) version: ')
 lambdaVec = np.arange(lambda_min,lambda_max+delta_lambda,delta_lambda)
+
 class forward(object):
     def __init__(self,shearWave,thickness,lambdaVec,name_displ_function):
         self.sWave = shearWave
@@ -20,11 +22,13 @@ class forward(object):
         self.t = np.append(0,self.t)
         self.nLayer = len(self.t)-1
         self.par_disp_func = name_displ_function
+
     def boundaries(self):
         z = sp.Symbol('z')
         low = self.t[:-1]
         up = self.t[1:]
         return z,up,low
+
     def pdf1(self,lambdaScalar):
         self.lam = lambdaScalar
         z,up,low = self.boundaries()
@@ -39,6 +43,7 @@ class forward(object):
                 break
         weights = unit/totA
         return weights
+
     def pdf2(self,lambdaScalar):
         self.lam = lambdaScalar
         z,up,low = self.boundaries()
@@ -53,6 +58,7 @@ class forward(object):
             unit[j] = unit_term1 + unit_term2
         weights = unit/totA
         return weights
+
     def weightMat(self):
         W = np.zeros((len(self.lamVec),self.nLayer))
         for i,lambdaValue in enumerate(self.lamVec):
@@ -62,16 +68,19 @@ class forward(object):
                 weights = self.pdf2(lambdaValue)
             W[i,:] = weights
         return W
+
     def svd(self):
         W = self.weightMat()
         U,S,VT = np.linalg.svd(W,full_matrices=False)
         get_W = np.dot(U,np.dot(np.linalg.inv(np.diag(S)),VT))
         invert_svd_W = np.dot(VT.T,np.dot(np.linalg.inv(np.diag(S)),U.T))
         return invert_svd_W
+
     def dispersionCurve(self):
         waveMatrix = self.weightMat()
         rWave = 0.93*np.dot(waveMatrix,self.sWave)
         return rWave
+
     def newLayer(self,input_nLayer,coeff):
         newLayers = [0]
         for i in range(len(self.lamVec[:input_nLayer])):
@@ -79,6 +88,7 @@ class forward(object):
                 newLayers.append(np.inf)
             else:
                 newLayers.append(self.lamVec[:input_nLayer][i]*coeff)
+        print(newLayers)
         return newLayers
 
 class backward(object):
@@ -86,6 +96,7 @@ class backward(object):
         self.input_nLayer = check_nLayer
         self.lam_depth_coeff = wavelength_depth_rat
         self.dispersion = forward(shearWave,thickness,lambdaVec,name_displ_function)
+
     def weight_table(self,Matrix,index ='Lambda {}',columns='Layer {}',Name = ''):
         rowLabels,colLabels = [],[]
         for i in range(len(Matrix[:,0])):
@@ -94,30 +105,56 @@ class backward(object):
             colLabels.append(columns.format(j+1))
         weights_new_df = DataFrame(Matrix,index=Index(rowLabels,name=Name),columns=colLabels)
         return weights_new_df
+
     def inversionData(self):
         input_thickness = self.dispersion.newLayer(self.input_nLayer,self.lam_depth_coeff)[1:]
         input_rWave = self.dispersion.dispersionCurve()
         input_sWave_convert = (1/0.93)*input_rWave
         input_lamda_Vec = lambdaVec
-        return input_sWave_convert,input_thickness,input_lamda_Vec
+        return input_rWave,input_sWave_convert,input_thickness,input_lamda_Vec
+
     def new_weight_matrix_checkpoints(self):
-        input_sWave_convert,input_thickness,input_lamda_Vec = self.inversionData()
+        _,input_sWave_convert,input_thickness,input_lamda_Vec = self.inversionData()
         self.input_sWave_convert_check = input_sWave_convert[:self.input_nLayer]
         input_thickness_check = input_thickness[:self.input_nLayer]
         input_lamda_Vec_check = input_lamda_Vec[:self.input_nLayer]
         self.dispersion_new_check = forward(self.input_sWave_convert_check,input_thickness_check,input_lamda_Vec_check,name_displ_function)
         weight_new_check = self.dispersion_new_check.weightMat()
+        new_phase_velocity = self.dispersion_new_check.dispersionCurve()
         weight_new_check_table = self.weight_table(weight_new_check)
-        return weight_new_check_table
+        return weight_new_check_table,new_phase_velocity
+
     def inversion(self):
         invert_svd_W_check = self.dispersion_new_check.svd()
         convert_sWave = np.matmul(invert_svd_W_check,self.input_sWave_convert_check)
         return convert_sWave
+    
+    def check_dispersion_data(self):
+        match_shear_wave = self.dispersion_new_check.dispersionCurve()
+        return match_shear_wave
 
 wavelength_depth_rat = 1
-check_nLayer = 4
+check_nLayer = total_refine_layers
+
 dispersion = forward(shearWave,thickness,lambdaVec,name_displ_function)
 test = backward(check_nLayer,wavelength_depth_rat)
 
-print(test.new_weight_matrix_checkpoints())
-print(test.inversion())
+new_weight,new_phase_velocity = test.new_weight_matrix_checkpoints()
+convert_Swave = test.inversion()
+
+def plot(Lambda,Vph,new_phase_velocity):
+    fig,ax = plt.subplots(figsize=(4,5),dpi=100)
+    ax.plot(Vph,Lambda,'-bo',markerfacecolor='None')
+    ax.plot(new_phase_velocity,Lambda[:len(new_phase_velocity)],'-ro',markerfacecolor='None')
+    ax.invert_yaxis()
+    ax.set_xlabel('Phase velocity, Vph [m/s]')
+    ax.set_ylabel('Wavelength, [m]')
+    ax.xaxis.set_label_position('top')
+    ax.xaxis.tick_top()
+    ax.spines['bottom'].set_color('white')
+    ax.spines['right'].set_color('white')
+
+    plt.show()
+
+Phase_velocity,Shear_velocity,Thickness,Wavelegnth = test.inversionData()
+plot(Wavelegnth,Phase_velocity,new_phase_velocity)

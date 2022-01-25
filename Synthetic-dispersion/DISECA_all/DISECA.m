@@ -66,7 +66,9 @@ Z = 5;                              %gain of the synthetic waveform
 beta = 1/8000;                      %damping coefficient
 
 %load data of dispersive curve (in EXCEL format) - need to be defined in which columns are the frequency and the phase celocity data
-data = xlsread('DispData_INPUT.xls');           %basic mode
+% data = xlsread('DispData_INPUT.xls');           %basic mode
+data = readtable('DispData_INPUT.xls','Range','A2:F132');
+data = table2array(data);
 %data = xlsread('DispData_INPUT_1mode.xls');    %first higher mode
 f = data(:,1);                                  %column with frequency [Hz]
 vph = data(:,3);                                %column with phase velocity [km/s]

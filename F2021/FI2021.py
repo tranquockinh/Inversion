@@ -9,8 +9,8 @@ PR = 0.3 # Poisson'a ratio
 beta = (0.87+1.12*PR)/(1+PR)
 Layer_Data = np.array([[150,6],
                        [400,np.inf]])
-waveLength0 = 3
-deltaWaveLength = 2
+waveLength0 = 6
+deltaWaveLength = 6
 Lambda = np.arange(waveLength0,44,deltaWaveLength)
 def dataInput(soilProfile,desiredWavelength):
     numLayers = len(soilProfile[:,0])
@@ -97,7 +97,7 @@ def SVD(WEIGHT_MATRIX):
     return regetWeight,invertWeight
 
 def newLayerArray(numLayerArray):
-    coeff = 0.85
+    coeff = 0.3
     newLayerSet = []
     for i in range(numLayerArray+1):
         if i == 0:
@@ -133,7 +133,7 @@ def CheckPoint(numLayerRefine,Vph,Lambda):
     newVs = np.matmul(invertWeight,convertVs)
     return layerRefineSet,newWeightMatrix,newVs
 
-layerRefineSet,newWeightMatrix,newVs = CheckPoint(5, Vph, Lambda)
+layerRefineSet,newWeightMatrix,newVs = CheckPoint(2, Vph, Lambda)
 print('\n\nNew array of shear wave velocity is:\n',newVs)
 
 def checkDC(useLayers,useVs):
